@@ -2,7 +2,13 @@ import React from 'react'
 
 const page = () => {
   return (
-    <div>home page</div>
+    <>
+      <section className='card-cta'>
+        <div>
+          
+        </div>
+      </section>
+    </>
   )
 }
 
