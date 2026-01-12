@@ -1,109 +1,197 @@
-"use client"
+"use client";
 
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import Image from "next/image"
-import Link from "next/link"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Form } from "@/components/ui/form"
-import CustomFormField from "@/components/FormField"
-import { useRouter } from "next/navigation"
+import React from "react";
+import { z } from "zod";
+import Link from "next/link";
+import Image from "next/image";
+import { toast } from "sonner";
+import { auth } from "@/firebase/client";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-type FormType = "sign-in" | "sign-up"
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
-/* ---------------- SCHEMA ---------------- */
-const AuthFormSchema = (type: FormType) =>
-  z.object({
-    name:
-      type === "sign-up"
-        ? z.string().min(3, "Name must be at least 3 characters")
-        : z.string().optional(),
-    email: z.string().email("Invalid email address"),
+import { Form } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+
+import { signIn, signUp } from "@/lib/actions/auth.action";
+import FormField from "./FormField";
+import type { FormType } from "@/types";
+
+const authFormSchema = (type: FormType) => {
+  return z.object({
+    name: type === "sign-up" ? z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be less than 50 characters") : z.string().optional(),
+    email: z.string().email("Please enter a valid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
-  })
+  });
+};
 
-/* ---------------- COMPONENT ---------------- */
 const AuthForm = ({ type }: { type: FormType }) => {
-  const router = useRouter()
-  const isSignIn = type === "sign-in"
+  const [isLoading, setIsLoading] = React.useState(false);
+  const router = useRouter();
 
-  const formSchema = AuthFormSchema(type)
-
+  const formSchema = authFormSchema(type);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
 
-    // 🔥 IMPORTANT: defaultValues must match schema
-    defaultValues:
-      type === "sign-up"
-        ? {
-            name: "",
-            email: "",
-            password: "",
-          }
-        : {
-            email: "",
-            password: "",
-          },
-  })
-
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
     try {
-      console.log(values) // <-- real values
+      if (type === "sign-up") {
+        const { name, email, password } = data;
 
-      if (isSignIn) {
-        toast.success("Signed in successfully")
-        router.push("/")
+        // Create user in Firebase Auth
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        // Get ID token immediately after user creation
+        const idToken = await userCredential.user.getIdToken(true);
+        
+        if (!idToken) {
+          toast.error("Failed to get authentication token. Please try again.");
+          return;
+        }
+
+        // Call server action with proper error handling
+        const signUpResult = await signUp({
+          idToken,
+          name: name!,
+        });
+
+        if (!signUpResult?.success) {
+          // If server-side fails, clean up the Firebase user
+          try {
+            await userCredential.user.delete();
+          } catch (deleteError) {
+            console.error("Failed to cleanup Firebase user:", deleteError);
+          }
+          
+          toast.error(signUpResult?.message || "Failed to create account");
+          return;
+        }
+
+        toast.success("Account created and signed in successfully.");
+        router.push("/");
       } else {
-        toast.success("Account created successfully")
-        router.push("/sign-in")
+        const { email, password } = data;
+
+        // Sign in user
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        // Force token refresh to get a fresh token
+        const idToken = await userCredential.user.getIdToken(true);
+        
+        if (!idToken) {
+          toast.error("Authentication failed. Please try again.");
+          return;
+        }
+
+        // Call server action
+        const result = await signIn({
+          idToken,
+        });
+
+        if (!result?.success) {
+          toast.error(result?.message || "Sign in failed");
+          return;
+        }
+
+        toast.success("Signed in successfully.");
+        router.push("/");
       }
-    } catch (error) {
-      console.error(error)
-      toast.error("Something went wrong")
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      
+      // Handle specific Firebase errors
+      let errorMessage = "An unexpected error occurred";
+      
+      if (error.code) {
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = "Email already in use. Please sign in instead.";
+            break;
+          case 'auth/invalid-email':
+            errorMessage = "Invalid email address.";
+            break;
+          case 'auth/weak-password':
+            errorMessage = "Password is too weak. Please choose a stronger password.";
+            break;
+          case 'auth/user-not-found':
+            errorMessage = "No account found with this email. Please sign up.";
+            break;
+          case 'auth/wrong-password':
+            errorMessage = "Incorrect password. Please try again.";
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = "Too many failed attempts. Please try again later.";
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = "Network error. Please check your connection.";
+            break;
+          default:
+            errorMessage = error.message || "Authentication failed. Please try again.";
+        }
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
+
+  const isSignIn = type === "sign-in";
 
   return (
     <div className="card-border lg:min-w-[566px]">
       <div className="flex flex-col gap-6 card py-14 px-10">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2">
-          <Image src="/logo.svg" alt="logo" width={32} height={38} />
-          <h2 className="text-xl font-semibold text-primary-100">
-            PerpWise AI
-          </h2>
+        <div className="flex flex-row gap-2 justify-center">
+          <Image src="/logo.svg" alt="logo" height={32} width={38} />
+          <h2 className="text-primary-100">PrepWise</h2>
         </div>
 
-        <p className="text-sm text-muted-foreground text-center">
-          Practice mock interviews with AI
-        </p>
+        <h3>Practice job interviews with AI</h3>
 
-        {/* Form */}
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="w-full space-y-6 mt-4"
+            className="w-full space-y-6 mt-4 form"
           >
             {!isSignIn && (
-              <CustomFormField
+              <FormField
                 control={form.control}
                 name="name"
-                label="Full Name"
-                placeholder="Enter your full name"
+                label="Name"
+                placeholder="Your Name"
+                type="text"
               />
             )}
 
-            <CustomFormField
+            <FormField
               control={form.control}
               name="email"
               label="Email"
-              placeholder="Enter your email"
+              placeholder="Your email address"
               type="email"
             />
 
-            <CustomFormField
+            <FormField
               control={form.control}
               name="password"
               label="Password"
@@ -111,29 +199,33 @@ const AuthForm = ({ type }: { type: FormType }) => {
               type="password"
             />
 
-            <Button
-              type="submit"
-              className="btn w-full"
-              disabled={form.formState.isSubmitting}
-            >
-              {isSignIn ? "Sign In" : "Create Account"}
+            <Button className="btn w-full" type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  {isSignIn ? "Signing In..." : "Creating Account..."}
+                </div>
+              ) : isSignIn ? (
+                "Sign In"
+              ) : (
+                "Create an Account"
+              )}
             </Button>
           </form>
         </Form>
 
-        {/* Switch */}
-        <p className="text-center text-sm">
-          {isSignIn ? "Don't have an account?" : "Already have an account?"}
+        <p className="text-center">
+          {isSignIn ? "No account yet?" : "Have an account already?"}
           <Link
-            href={isSignIn ? "/sign-up" : "/sign-in"}
-            className="font-bold text-primary ml-1"
+            href={!isSignIn ? "/sign-in" : "/sign-up"}
+            className="font-bold text-user-primary ml-1"
           >
-            {isSignIn ? "Sign Up" : "Sign In"}
+            {!isSignIn ? "Sign In" : "Sign Up"}
           </Link>
         </p>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default AuthForm
+export default AuthForm;
