@@ -1,5 +1,6 @@
 import React from "react";
 import { interviewCovers } from "@/constants/index";
+import type { InterviewCardProps, Feedback } from "@/types";
 import dayjs from "dayjs";
 import Image from "next/image";
 import { getRandomInterviewCover } from "@/lib/utils";

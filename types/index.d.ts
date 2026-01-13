@@ -72,11 +72,13 @@ export interface GetLatestInterviewsParams {
 }
 
 export interface SignInParams {
-  idToken: string;
+  email: string;
+  password: string;
 }
 
 export interface SignUpParams {
-  idToken: string;
+  email: string;
+  password: string;
   name: string;
 }
 

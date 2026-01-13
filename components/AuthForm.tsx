@@ -5,15 +5,9 @@ import { z } from "zod";
 import Link from "next/link";
 import Image from "next/image";
 import { toast } from "sonner";
-import { auth } from "@/firebase/client";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -24,7 +18,13 @@ import type { FormType } from "@/types";
 
 const authFormSchema = (type: FormType) => {
   return z.object({
-    name: type === "sign-up" ? z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be less than 50 characters") : z.string().optional(),
+    name:
+      type === "sign-up"
+        ? z
+            .string()
+            .min(2, "Name must be at least 2 characters")
+            .max(50, "Name must be less than 50 characters")
+        : z.string().optional(),
     email: z.string().email("Please enter a valid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
   });
@@ -50,62 +50,33 @@ const AuthForm = ({ type }: { type: FormType }) => {
       if (type === "sign-up") {
         const { name, email, password } = data;
 
-        // Create user in Firebase Auth
-        const userCredential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-
-        // Get ID token immediately after user creation
-        const idToken = await userCredential.user.getIdToken(true);
-        
-        if (!idToken) {
-          toast.error("Failed to get authentication token. Please try again.");
-          return;
-        }
-
-        // Call server action with proper error handling
         const signUpResult = await signUp({
-          idToken,
+          email,
+          password,
           name: name!,
         });
 
         if (!signUpResult?.success) {
-          // If server-side fails, clean up the Firebase user
-          try {
-            await userCredential.user.delete();
-          } catch (deleteError) {
-            console.error("Failed to cleanup Firebase user:", deleteError);
-          }
-          
           toast.error(signUpResult?.message || "Failed to create account");
           return;
         }
 
-        toast.success("Account created and signed in successfully.");
-        router.push("/");
+        if (signUpResult?.session) {
+          toast.success("Account created and signed in successfully.");
+          router.push("/");
+        } else {
+          toast.info(
+            "Account created! Please check your email to confirm your account."
+          );
+          // Optional: redirect to sign-in or stay here
+          router.push("/sign-in");
+        }
       } else {
         const { email, password } = data;
 
-        // Sign in user
-        const userCredential = await signInWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-
-        // Force token refresh to get a fresh token
-        const idToken = await userCredential.user.getIdToken(true);
-        
-        if (!idToken) {
-          toast.error("Authentication failed. Please try again.");
-          return;
-        }
-
-        // Call server action
         const result = await signIn({
-          idToken,
+          email,
+          password,
         });
 
         if (!result?.success) {
@@ -118,39 +89,7 @@ const AuthForm = ({ type }: { type: FormType }) => {
       }
     } catch (error: any) {
       console.error("Auth error:", error);
-      
-      // Handle specific Firebase errors
-      let errorMessage = "An unexpected error occurred";
-      
-      if (error.code) {
-        switch (error.code) {
-          case 'auth/email-already-in-use':
-            errorMessage = "Email already in use. Please sign in instead.";
-            break;
-          case 'auth/invalid-email':
-            errorMessage = "Invalid email address.";
-            break;
-          case 'auth/weak-password':
-            errorMessage = "Password is too weak. Please choose a stronger password.";
-            break;
-          case 'auth/user-not-found':
-            errorMessage = "No account found with this email. Please sign up.";
-            break;
-          case 'auth/wrong-password':
-            errorMessage = "Incorrect password. Please try again.";
-            break;
-          case 'auth/too-many-requests':
-            errorMessage = "Too many failed attempts. Please try again later.";
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = "Network error. Please check your connection.";
-            break;
-          default:
-            errorMessage = error.message || "Authentication failed. Please try again.";
-        }
-      }
-      
-      toast.error(errorMessage);
+      toast.error(error.message || "Authentication failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
