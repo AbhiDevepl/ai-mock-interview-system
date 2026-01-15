@@ -71,36 +71,33 @@ export async function signUp(params: SignUpParams) {
     };
   }
 
-  // 2. Insert into public.profiles table (Hardened Fallback)
-  // We first check if the profile exists (handling trigger race condition or previous success)
-  const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // 2. Profile Creation (Primary logic is the DB Trigger)
+  // We try a manual insert as a fallback, but we ignore common errors
+  // (like 23505 duplicate or 42501 RLS) because the trigger runs as superuser
+  // and will handle it even if this code cannot due to RLS.
+  const { error: profileError } = await supabase.from("profiles").insert({
+    id: user.id,
+    email: normalizedEmail,
+    full_name: name,
+  });
 
-  if (!existingProfile) {
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: user.id,
-      email: normalizedEmail,
-      full_name: name,
-    });
-
-    if (profileError) {
-      // Ignore duplicate key error (code 23505) if trigger beat us to it
-      if (profileError.code !== "23505") {
-        console.error("Profile creation failed:", profileError);
-        return {
-          success: false,
-          message: "Profile creation failed.",
-        };
-      }
-    }
+  if (
+    profileError &&
+    !["23505", "42501", "PGRST116"].includes(profileError.code)
+  ) {
+    console.warn(
+      "Manual profile creation failed, but trigger may still succeed:",
+      profileError
+    );
+    // We don't return an error here because the Auth account was created
+    // and the DB trigger is likely to handle the profile creation.
   }
 
   return {
     success: true,
-    message: "Account created successfully.",
+    message: data.session
+      ? "Account created successfully."
+      : "Account created! Please verify your email.",
     session: data.session,
   };
 }

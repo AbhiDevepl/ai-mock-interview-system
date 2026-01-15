@@ -1,39 +1,37 @@
-import React from "react";
+"use client";
+
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 enum CallStatus {
-  INACTIVE = "inactive",
-  ACTIVE = "active",
-  CONNECTING = "connecting",
-  FINISHED = "finished",
+  INACTIVE = "INACTIVE",
+  CONNECTING = "CONNECTING",
+  ACTIVE = "ACTIVE",
+  FINISHED = "FINISHED",
 }
 
 interface AgentProps {
   userName: string;
+  userEmail?: string;
   userId?: string;
-  type?: string;
+  type?: "generate" | "interview";
 }
 
 const Agent = ({ userName }: AgentProps) => {
+  const callStatus = CallStatus.FINISHED as CallStatus;
   const isSpeaking = true;
-  // Using state to manage call status for basic interactivity,
-  // though currently logic is mostly placeholder.
-  const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
-
   const messages = [
-    "Whats your name??",
-    "My name is Abhay Jadhav, Nice to meet you!!",
+    "Whats your name?",
+    "My name is Abhay Jadhav, nice to meet you!",
   ];
   const lastMessage = messages[messages.length - 1];
 
   return (
     <>
       <div className="call-view">
-        <div className="card-interview">
+        <div className="card-interviewer">
           <div className="avatar">
-            <img
+            <Image
               src="/ai-avatar.png"
               alt="vapi"
               width={65}
@@ -44,8 +42,9 @@ const Agent = ({ userName }: AgentProps) => {
           </div>
           <h3>AI Interviewer</h3>
         </div>
+
         <div className="card-border">
-          <div className="cord-content">
+          <div className="card-content">
             <Image
               src="/user-avatar.png"
               alt="user avatar"
@@ -57,16 +56,14 @@ const Agent = ({ userName }: AgentProps) => {
           </div>
         </div>
       </div>
-
       {messages.length > 0 && (
         <div className="transcript-border">
           <div className="transcript">
             <p
               key={lastMessage}
               className={cn(
-                "transition-opacity duration-500",
-                "opacity-0",
-                "animate-fade-in opacity-100"
+                "transition-opacity duration-500 opacity-0",
+                "animate-fadeIn opacity-100"
               )}
             >
               {lastMessage}
@@ -75,36 +72,28 @@ const Agent = ({ userName }: AgentProps) => {
         </div>
       )}
 
-      <div className="w-full flex justify-center items-center h-[100px]">
+      <div className="w-full flex justify-center">
         {callStatus !== CallStatus.ACTIVE ? (
-          <button
-            className="relative btn-call"
-            onClick={() => setCallStatus(CallStatus.ACTIVE)}
-          >
+          <button className="relative btn-call">
             <span
               className={cn(
                 "absolute animate-ping rounded-full opacity-75",
                 callStatus !== CallStatus.CONNECTING && "hidden"
               )}
             />
-            <span className="">
+
+            <span>
               {callStatus === CallStatus.INACTIVE ||
               callStatus === CallStatus.FINISHED
                 ? "Call"
-                : "..."}
+                : ". . . "}
             </span>
           </button>
         ) : (
-          <button
-            className="btn-disconnect"
-            onClick={() => setCallStatus(CallStatus.FINISHED)}
-          >
-            End
-          </button>
+          <button className="btn-disconnect">End</button>
         )}
       </div>
     </>
   );
 };
-
 export default Agent;

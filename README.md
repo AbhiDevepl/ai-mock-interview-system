@@ -173,3 +173,14 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+
+
+{
+  "type": "mixed",
+  "role": "backend",
+  "level": "intership",
+  "techstack": "next.js",
+  "amount": "3",
+  "userid":"f9d51ad8-f86f-4ffe-9a8a-a53ee8d39c7c"
+}
