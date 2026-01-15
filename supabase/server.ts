@@ -28,3 +28,20 @@ export const createClient = (
     },
   });
 };
+
+export const createAdminClient = () => {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is missing from environment variables"
+    );
+  }
+  return createServerClient(supabaseUrl!, key, {
+    cookies: {
+      getAll() {
+        return [];
+      },
+      setAll() {},
+    },
+  });
+};

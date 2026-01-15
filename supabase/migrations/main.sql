@@ -151,6 +151,34 @@ create table if not exists public.interviews (
   created_at timestamptz not null default now()
 );
 
+-- =====================================================
+-- ENSURE INTERVIEWS COLUMNS EXIST (SAFE)
+-- =====================================================
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'interviews'
+      and column_name = 'user_name'
+  ) then
+    alter table public.interviews add column user_name text;
+  end if;
+
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'interviews'
+      and column_name = 'user_email'
+  ) then
+    alter table public.interviews add column user_email text;
+  end if;
+end
+$$;
+
 alter table public.interviews enable row level security;
 
 
