@@ -16,6 +16,11 @@ const signInSchema = z.object({
   password: z.string().min(6),
 });
 
+// Helper to normalize email
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export async function signUp(params: SignUpParams) {
   const validationResult = signUpSchema.safeParse(params);
   if (!validationResult.success) {
@@ -26,11 +31,14 @@ export async function signUp(params: SignUpParams) {
   }
 
   const { email, password, name } = params;
+  const normalizedEmail = normalizeEmail(email);
+
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
+  // 1. Sign up with Supabase Auth
   const { data, error } = await supabase.auth.signUp({
-    email,
+    email: normalizedEmail,
     password,
     options: {
       data: {
@@ -40,10 +48,54 @@ export async function signUp(params: SignUpParams) {
   });
 
   if (error) {
+    if (
+      error.message.toLowerCase().includes("already") ||
+      error.message.toLowerCase().includes("registered")
+    ) {
+      return {
+        success: false,
+        message: "User already exists. Please sign in instead.",
+      };
+    }
     return {
       success: false,
-      message: error.message,
+      message: "Unable to create account. Please try again.",
     };
+  }
+
+  const user = data.user;
+  if (!user) {
+    return {
+      success: false,
+      message: "Signup failed. Please try again.",
+    };
+  }
+
+  // 2. Insert into public.profiles table (Hardened Fallback)
+  // We first check if the profile exists (handling trigger race condition or previous success)
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (!existingProfile) {
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: user.id,
+      email: normalizedEmail,
+      full_name: name,
+    });
+
+    if (profileError) {
+      // Ignore duplicate key error (code 23505) if trigger beat us to it
+      if (profileError.code !== "23505") {
+        console.error("Profile creation failed:", profileError);
+        return {
+          success: false,
+          message: "Profile creation failed.",
+        };
+      }
+    }
   }
 
   return {
