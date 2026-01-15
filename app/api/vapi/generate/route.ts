@@ -32,8 +32,8 @@ export async function POST(request: Request) {
     console.log("Processing for:", { finalUserId, finalName, finalEmail });
 
     const { text: questions } = await generateText({
-      model: google("gemini-flash-001"),
-      prompt: `Prepare questions for a job interview.
+      model: google("gemini-2.5-flash-lite"),
+      prompt: `Prepare questons for a job interview.
 The job role is ${role}.
 The job experience level is ${level}.
 The tech stack used in the job is: ${techstack}.
