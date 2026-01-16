@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     }
 
     return Response.json(
-      { success: true, data: "Interview saved!" ,questions: JSON.parse(cleanedQuestions)},
+      { success: true, data: "Interview saved!", questions: JSON.parse(cleanedQuestions)},
       { status: 200 }
     );
   } catch (error: any) {
