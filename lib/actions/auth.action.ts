@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { createClient } from "@/supabase/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
@@ -155,7 +156,7 @@ export async function signOut(): Promise<{
   };
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+export const getCurrentUser = cache(async (): Promise<User | null> => {
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
@@ -170,7 +171,7 @@ export async function getCurrentUser(): Promise<User | null> {
     name: user.user_metadata.name || "User",
     email: user.email || "",
   };
-}
+});
 
 export async function isAuthenticated(): Promise<boolean> {
   const user = await getCurrentUser();
