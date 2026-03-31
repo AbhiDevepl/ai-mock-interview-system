@@ -1,116 +1,71 @@
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 export interface InterviewSession {
   id: string;
   user_id: string;
-  room_id?: string;
-  status: "pending" | "active" | "completed";
+  room_id: string;
   role: string;
   level: string;
-  techstack: string[];
-  current_question_index: number;
+  tech_stack: string[];
   questions: string[];
+  status: "pending" | "running" | "completed" | "failed";
+  report: InterviewReport | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface InterviewResponse {
-  id: string;
-  session_id: string;
-  question_index: number;
-  question: string;
-  answer: string;
-  score?: number;
-  feedback?: string;
-  created_at: string;
-}
-
-export interface EvaluationResult {
-  score: number;
-  feedback: string;
+export interface InterviewReport {
+  score: number; // 0–100
   strengths: string[];
-  areasForImprovement: string[];
+  weaknesses: string[];
+  missed_questions: string[];
+  summary: string;
 }
 
-export interface StartInterviewOptions {
-  userId: string;
+// ── API helpers ───────────────────────────────────────────────────────────────
+
+async function apiCall<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || err.message || `Request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+// ── Generate questions via Gemini ─────────────────────────────────────────────
+
+export async function generateQuestions(params: {
   role: string;
   level: string;
   techstack: string[];
+}): Promise<string[]> {
+  const data = await apiCall<{ questions: string[] }>("/api/gemini/questions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return data.questions;
+}
+
+// ── Create session + trigger agent ───────────────────────────────────────────
+
+export async function startInterview(params: {
+  room_id: string;
+  role: string;
+  level: string;
+  tech_stack: string[];
   questions: string[];
-  roomId?: string;
-}
-
-export interface EvaluateAnswerOptions {
-  sessionId: string;
-  questionIndex: number;
-  question: string;
-  answer: string;
-}
-
-export async function startInterview(options: StartInterviewOptions): Promise<InterviewSession> {
-  const response = await fetch("/api/interview/start", {
+}): Promise<{ session_id: string }> {
+  return apiCall("/api/interview/start", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
   });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to start interview");
-  }
-
-  return response.json();
 }
 
-export async function evaluateAnswer(
-  options: EvaluateAnswerOptions
-): Promise<InterviewResponse & { evaluation: EvaluationResult }> {
-  const response = await fetch("/api/interview/evaluate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(options),
-  });
+// ── Fetch a single session ────────────────────────────────────────────────────
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to evaluate answer");
-  }
-
-  return response.json();
-}
-
-export async function getSession(
-  sessionId: string
-): Promise<InterviewSession & { responses: InterviewResponse[]; averageScore: number }> {
-  const response = await fetch(`/api/interview/session/${sessionId}`);
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to get session");
-  }
-
-  return response.json();
-}
-
-export async function updateSessionStatus(
-  sessionId: string,
-  status: "pending" | "active" | "completed",
-  currentQuestionIndex?: number
-): Promise<InterviewSession> {
-  const response = await fetch(`/api/interview/session/${sessionId}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ status, currentQuestionIndex }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update session");
-  }
-
-  return response.json();
+export async function getSession(sessionId: string): Promise<InterviewSession> {
+  return apiCall(`/api/interview/session/${sessionId}`);
 }

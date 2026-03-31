@@ -1,146 +1,170 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useInterview } from "@/lib/hooks/useInterview";
-import { useVideoSDK } from "@/lib/hooks/useVideoSDK";
-import { QuestionPanel } from "@/components/interview/QuestionPanel";
-import { FeedbackPanel } from "@/components/interview/FeedbackPanel";
-import { MeetingRoom } from "@/components/interview/MeetingRoom";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { EvaluationResult } from "@/lib/services/interview.service";
+import { createClient } from "@/supabase/client";
+import { getSession, InterviewSession } from "@/lib/services/interview.service";
+import Agent from "@/components/Agent";
+
+type SessionStatus = InterviewSession["status"];
 
 export default function MeetingPage() {
-  const params = useParams();
+  const { sessionId } = useParams<{ sessionId: string }>();
   const router = useRouter();
-  const sessionId = params.sessionId as string;
-  
-  const { token, roomId, fetchToken, isLoading: sdkLoading } = useVideoSDK();
-  const [showMeeting, setShowMeeting] = useState(false);
-  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  
-  const {
-    session,
-    currentQuestion,
-    currentQuestionIndex,
-    isLoading: interviewLoading,
-    submitAnswer,
-    nextQuestion,
-    completeInterview,
-    loadSession,
-  } = useInterview();
+
+  const [session, setSession] = useState<InterviewSession | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [userName, setUserName] = useState("Candidate");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // ── Load session + user name + VideoSDK token ──────────────────────────────
+  const loadSession = useCallback(async () => {
+    try {
+      const [sessionData, tokenRes] = await Promise.all([
+        getSession(sessionId),
+        (() => {
+          // Will be fetched after we know the roomId
+          return null;
+        })(),
+      ]);
+
+      setSession(sessionData);
+
+      // Fetch VideoSDK token for this room
+      const tokenResponse = await fetch("/api/videosdk/get-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: sessionData.room_id }),
+      });
+
+      if (!tokenResponse.ok) throw new Error("Failed to get VideoSDK token");
+      const { token: vToken } = await tokenResponse.json();
+      setToken(vToken);
+
+      // Fetch current user name
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.user_metadata?.name) {
+        setUserName(user.user_metadata.name as string);
+      }
+    } catch (err) {
+      console.error("Failed to load session:", err);
+      setError(err instanceof Error ? err.message : "Failed to load session");
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
-    loadSession(sessionId);
-  }, [sessionId, loadSession]);
+    loadSession();
+  }, [loadSession]);
 
+  // ── Subscribe to Supabase Realtime for status changes ─────────────────────
   useEffect(() => {
-    if (session?.room_id && !token) {
-      fetchToken(session.room_id);
-    }
-  }, [session?.room_id, token, fetchToken]);
+    if (!sessionId) return;
 
-  const handleSubmitAnswer = async (answer: string) => {
-    try {
-      const result = await submitAnswer(answer);
-      setEvaluation(result);
-      setShowFeedback(true);
-    } catch {
-      toast.error("Failed to submit answer");
-    }
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`session:${sessionId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "interview_sessions",
+          filter: `id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const updated = payload.new as InterviewSession;
+          setSession(updated);
+
+          if (updated.status === "completed") {
+            router.push(`/interview/results/${sessionId}`);
+          }
+          if (updated.status === "failed") {
+            setError("The interview session encountered an error. Please try again.");
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, router]);
+
+  // ── Status label helper ───────────────────────────────────────────────────
+  const statusLabel: Record<SessionStatus, string> = {
+    pending: "Waiting for AI Interviewer to connect…",
+    running: "Interview in progress",
+    completed: "Interview complete — redirecting…",
+    failed: "Session failed",
   };
 
-  const handleNextQuestion = () => {
-    setShowFeedback(false);
-    setEvaluation(null);
-    nextQuestion();
-  };
-
-  const handleFinish = async () => {
-    try {
-      await completeInterview();
-      router.push(`/interview/results/${sessionId}`);
-    } catch {
-      toast.error("Failed to complete interview");
-    }
-  };
-
-  const handleLeaveMeeting = () => {
-    setShowMeeting(false);
-  };
-
-  if (interviewLoading || sdkLoading) {
+  // ── Render ────────────────────────────────────────────────────────────────
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+        <div className="animate-pulse text-muted-foreground">
+          Setting up your interview…
+        </div>
       </div>
     );
   }
 
-  if (!session) {
+  if (error || !session || !token) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Session not found</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-destructive font-medium">
+          {error ?? "Session not found"}
+        </p>
+        <button
+          className="btn-call"
+          onClick={() => router.push("/interview/setup")}
+        >
+          Back to Setup
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">
-            {session.role} Interview - {session.level}
-          </h1>
-          {!showMeeting && (
-            <Button onClick={() => setShowMeeting(true)} variant="outline">
-              Open Video Call
-            </Button>
-          )}
+    <div className="min-h-screen flex flex-col items-center justify-start pt-10 px-4 gap-6">
+      {/* Status banner */}
+      <div className="w-full max-w-2xl">
+        <div
+          className={`rounded-xl px-4 py-2 text-sm font-medium text-center transition-colors ${
+            session.status === "running"
+              ? "bg-green-500/20 text-green-400"
+              : session.status === "failed"
+              ? "bg-red-500/20 text-red-400"
+              : "bg-yellow-500/20 text-yellow-400"
+          }`}
+        >
+          {statusLabel[session.status]}
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            {showMeeting && token && roomId ? (
-              <MeetingRoom
-                token={token}
-                roomId={roomId}
-                userName="Candidate"
-                onLeave={handleLeaveMeeting}
-              />
-            ) : (
-              <QuestionPanel
-                question={currentQuestion}
-                questionIndex={currentQuestionIndex}
-                totalQuestions={session.questions.length}
-                onSubmit={handleSubmitAnswer}
-                isLoading={interviewLoading}
-              />
-            )}
-          </div>
+      {/* Interview details */}
+      <div className="text-center text-muted-foreground text-sm">
+        <span className="font-medium text-foreground">{session.role}</span>
+        {" · "}
+        {session.level}
+        {" · "}
+        {session.tech_stack.join(", ")}
+      </div>
 
-          <div className="space-y-6">
-            <div className="border rounded-lg bg-card">
-              <FeedbackPanel evaluation={evaluation} isLoading={showFeedback && interviewLoading} />
-            </div>
-
-            {showFeedback && (
-              <div className="flex gap-4">
-                {currentQuestionIndex < session.questions.length - 1 ? (
-                  <Button onClick={handleNextQuestion} className="flex-1">
-                    Next Question
-                  </Button>
-                ) : (
-                  <Button onClick={handleFinish} className="flex-1">
-                    Finish Interview
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* VideoSDK meeting room */}
+      <div className="w-full max-w-2xl">
+        <Agent
+          userName={userName}
+          roomId={session.room_id}
+          token={token}
+        />
       </div>
     </div>
   );

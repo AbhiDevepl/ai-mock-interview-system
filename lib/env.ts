@@ -11,6 +11,8 @@ const envSchema = z.object({
   VIDEOSDK_API_KEY: z.string().optional(),
   VIDEOSDK_SECRET_KEY: z.string().optional(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
+  // URL of the Python FastAPI agent service
+  PYTHON_AGENT_URL: z.string().default("http://localhost:8000"),
 });
 
 export const env = envSchema.parse({
@@ -21,4 +23,5 @@ export const env = envSchema.parse({
   VIDEOSDK_API_KEY: process.env.VIDEOSDK_API_KEY,
   VIDEOSDK_SECRET_KEY: process.env.VIDEOSDK_SECRET_KEY,
   GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+  PYTHON_AGENT_URL: process.env.PYTHON_AGENT_URL,
 });

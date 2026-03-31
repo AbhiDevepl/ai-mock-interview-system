@@ -1,15 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { InterviewSetup } from "@/components/interview/InterviewSetup";
-import { startInterview } from "@/lib/services/interview.service";
-import { useVideoSDK } from "@/lib/hooks/useVideoSDK";
+import { generateQuestions, startInterview } from "@/lib/services/interview.service";
+import { createRoom } from "@/lib/services/videosdk.service";
 
 export default function InterviewSetupPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const { createNewRoom } = useVideoSDK();
 
   const handleStartInterview = async (data: {
     role: string;
@@ -18,45 +18,38 @@ export default function InterviewSetupPage() {
   }) => {
     setIsLoading(true);
     try {
-      const { roomId } = await createNewRoom();
-      
-      const questions = generateQuestions(data.role, data.level, data.techstack);
-      
-      const session = await startInterview({
-        userId: "current-user",
+      // 1. Create VideoSDK room
+      toast.loading("Creating interview room…", { id: "setup" });
+      const { roomId } = await createRoom();
+
+      // 2. Generate questions with Gemini
+      toast.loading("Generating questions with AI…", { id: "setup" });
+      const questions = await generateQuestions({
         role: data.role,
         level: data.level,
         techstack: data.techstack,
-        questions,
-        roomId,
       });
 
-      router.push(`/interview/meeting/${session.id}`);
+      // 3. Create session in Supabase + trigger Python agent
+      toast.loading("Starting interview session…", { id: "setup" });
+      const { session_id } = await startInterview({
+        room_id: roomId,
+        role: data.role,
+        level: data.level,
+        tech_stack: data.techstack,
+        questions,
+      });
+
+      toast.success("Interview ready! Joining room…", { id: "setup" });
+      router.push(`/interview/meeting/${session_id}`);
     } catch (error) {
       console.error("Failed to start interview:", error);
-      throw error;
+      const message =
+        error instanceof Error ? error.message : "Failed to start interview";
+      toast.error(message, { id: "setup" });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const generateQuestions = (role: string, level: string, techstack: string[]) => {
-    const questions: string[] = [];
-    
-    questions.push(`Tell me about yourself and your experience as a ${role}.`);
-    
-    questions.push(`What is your experience with ${techstack[0] || "the required technologies"}?`);
-    
-    questions.push(level === "Junior" 
-      ? `Describe a project you've worked on that demonstrates your skills.`
-      : `Describe a challenging technical problem you solved in a production environment.`
-    );
-    
-    questions.push(`What are your strengths and weaknesses as a ${role}?`);
-    
-    questions.push(`Where do you see yourself in 3-5 years?`);
-    
-    return questions;
   };
 
   return (

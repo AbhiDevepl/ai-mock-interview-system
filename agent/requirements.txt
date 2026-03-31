@@ -1,3 +1,0 @@
-videosdk-agents
-videosdk-plugins-google
-python-dotenv

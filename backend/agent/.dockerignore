@@ -1,0 +1,94 @@
+# ===========================================
+# PrepWise - Docker Ignore for Python Agent
+# ===========================================
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+*.egg
+dist
+build
+
+# Virtual environments
+.venv
+venv
+env
+.env
+.env.local
+
+# Poetry
+.poetry
+poetry.lock
+
+# IDE & Editor
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Logs
+logs
+*.log
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+.nox
+
+# Docker files
+Dockerfile
+Dockerfile.*
+docker-compose.yml
+.dockerignore
+
+# Next.js app (separate container)
+app
+components
+public
+lib
+types
+constants
+.next
+
+# Node.js files
+node_modules
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Misc
+.DS_Store
+Thumbs.db
+*.pem
+*.md
+README.md
+
+# Cache
+*.pyc
+__pycache__
+.cache
+.mypy_cache
+.pytype
+
+# Temp files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Rust (if any)
+target
+Cargo.lock

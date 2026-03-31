@@ -1,59 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createClient, createAdminClient } from "@/supabase/server";
 import { env } from "@/lib/env";
-
-const supabase = createClient(
-  env.NEXT_PUBLIC_SUPABASE_URL,
-  env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { 
-      userId, 
-      role, 
-      level, 
-      techstack, 
-      questions,
-      roomId 
-    } = body;
+    // ── 1. Authenticate the user ──────────────────────────────
+    const cookieStore = await cookies();
+    const supabase = createClient(cookieStore);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!userId || !role || !level) {
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // ── 2. Parse and validate the body ───────────────────────
+    const body = await request.json();
+    const { room_id, role, level, tech_stack, questions } = body as {
+      room_id: string;
+      role: string;
+      level: string;
+      tech_stack: string[];
+      questions: string[];
+    };
+
+    if (!room_id || !role || !level || !tech_stack?.length || !questions?.length) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "room_id, role, level, tech_stack, and questions are required" },
         { status: 400 }
       );
     }
 
-    const { data, error } = await supabase
+    // ── 3. Create session in Supabase (service role bypasses RLS) ──
+    const adminSupabase = createAdminClient();
+    const { data: session, error: dbError } = await adminSupabase
       .from("interview_sessions")
       .insert({
-        user_id: userId,
+        user_id: user.id,
+        room_id,
         role,
         level,
-        techstack: techstack || [],
-        current_question_index: 0,
+        tech_stack,
+        questions,
         status: "pending",
-        room_id: roomId,
-        questions: questions || [],
       })
       .select()
       .single();
 
-    if (error) {
-      console.error("Error creating session:", error);
+    if (dbError || !session) {
+      console.error("[Interview Start] DB insert error:", dbError);
       return NextResponse.json(
-        { error: "Failed to create session" },
+        { error: "Failed to create session", message: dbError?.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(data);
+    // ── 4. Trigger the Python agent (fire-and-forget) ────────
+    const agentUrl = `${env.PYTHON_AGENT_URL}/start`;
+
+    try {
+      const agentRes = await fetch(agentUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: session.id }),
+        signal: AbortSignal.timeout(10_000), // 10 second timeout
+      });
+
+      if (!agentRes.ok) {
+        const err = await agentRes.text();
+        throw new Error(`Agent returned ${agentRes.status}: ${err}`);
+      }
+    } catch (agentError) {
+      console.error("[Interview Start] Failed to trigger agent:", agentError);
+      // Mark session as failed so the UI doesn't hang
+      await adminSupabase
+        .from("interview_sessions")
+        .update({ status: "failed" })
+        .eq("id", session.id);
+
+      return NextResponse.json(
+        {
+          error: "Agent service unavailable. Is the Python agent running?",
+          session_id: session.id,
+        },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({ session_id: session.id });
   } catch (error) {
-    console.error("Error starting interview:", error);
+    console.error("[Interview Start] Unexpected error:", error);
     return NextResponse.json(
-      { error: "Failed to start interview" },
+      {
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

@@ -19,6 +19,15 @@ export interface GetTokenResponse {
   expiresAt: string;
 }
 
+async function safeJson(response: Response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await response.text();
+    throw new Error(`Server error (${response.status}): ${text.slice(0, 200)}`);
+  }
+  return response.json();
+}
+
 export async function createRoom(options: CreateRoomOptions = {}): Promise<CreateRoomResponse> {
   const response = await fetch("/api/videosdk/create-room", {
     method: "POST",
@@ -29,8 +38,9 @@ export async function createRoom(options: CreateRoomOptions = {}): Promise<Creat
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || "Failed to create room");
+    const error = await safeJson(response);
+    console.error("[createRoom] Error:", error);
+    throw new Error(error.message || error.error || `Failed to create room (${response.status})`);
   }
 
   return response.json();
