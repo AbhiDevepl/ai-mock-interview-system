@@ -9,11 +9,15 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { Input } from "@/components/ui/input";
+
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 
 import { signIn, signUp } from "@/lib/actions/auth.action";
-import FormField from "./FormField";
+import { FormField } from "./FormField";
 import type { FormType } from "@/types";
 
 const authFormSchema = (type: FormType) => {

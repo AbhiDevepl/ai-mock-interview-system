@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { MeetingProvider, useMeeting, useParticipant, usePubSub, Constants } from "@videosdk.live/react-sdk";
 
 enum CallStatus {
   INACTIVE = "INACTIVE",
@@ -17,14 +20,53 @@ interface AgentProps {
   type?: "generate" | "interview";
 }
 
-const Agent = ({ userName }: AgentProps) => {
-  const callStatus = CallStatus.FINISHED as CallStatus;
-  const isSpeaking = true;
-  const messages = [
-    "Whats your name?",
-    "My name is Abhay Jadhav, nice to meet you!",
-  ];
-  const lastMessage = messages[messages.length - 1];
+const MeetingView = ({ userName, callStatus, setCallStatus }: any) => {
+  const [agentJoined, setAgentJoined] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [messages, setMessages] = useState<string[]>([]);
+  
+  const { join, leave, participants } = useMeeting({
+    onMeetingJoined: () => {
+      setCallStatus(CallStatus.ACTIVE);
+      toast.success("Joined interview room");
+    },
+    onMeetingLeft: () => {
+      setCallStatus(CallStatus.FINISHED);
+      toast.info("Left interview room");
+    },
+    onParticipantJoined: (participant) => {
+      if (participant.displayName === "AI Interviewer") {
+        setAgentJoined(true);
+        toast.success("AI Interviewer joined!");
+      }
+    },
+    onParticipantLeft: (participant) => {
+      if (participant.displayName === "AI Interviewer") {
+        setAgentJoined(false);
+        setIsSpeaking(false);
+      }
+    },
+    onSpeakerChanged: (activeSpeakerId) => {
+      if (activeSpeakerId) {
+        const participant = participants.get(activeSpeakerId);
+        if (participant?.displayName === "AI Interviewer") {
+          setIsSpeaking(true);
+        } else {
+          setIsSpeaking(false);
+        }
+      } else {
+        setIsSpeaking(false);
+      }
+    }
+  });
+
+  usePubSub("CHAT", {
+    onMessageReceived: (message) => {
+      setMessages((prev: string[]) => [...prev, message.message as string]);
+    }
+  });
+
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : "";
 
   return (
     <>
@@ -33,7 +75,7 @@ const Agent = ({ userName }: AgentProps) => {
           <div className="avatar">
             <Image
               src="/ai-avatar.png"
-              alt="vapi"
+              alt="AI Interviewer"
               width={65}
               height={54}
               className="object-cover"
@@ -56,7 +98,8 @@ const Agent = ({ userName }: AgentProps) => {
           </div>
         </div>
       </div>
-      {messages.length > 0 && (
+      
+      {lastMessage && (
         <div className="transcript-border">
           <div className="transcript">
             <p
@@ -72,28 +115,56 @@ const Agent = ({ userName }: AgentProps) => {
         </div>
       )}
 
-      <div className="w-full flex justify-center">
+      <div className="w-full flex justify-center mt-4">
         {callStatus !== CallStatus.ACTIVE ? (
-          <button className="relative btn-call">
-            <span
+          <button 
+            className="btn-call relative" 
+            disabled={callStatus === CallStatus.CONNECTING}
+            onClick={() => { setCallStatus(CallStatus.CONNECTING); join(); }}
+          >
+             <span
               className={cn(
                 "absolute animate-ping rounded-full opacity-75",
                 callStatus !== CallStatus.CONNECTING && "hidden"
               )}
             />
-
-            <span>
-              {callStatus === CallStatus.INACTIVE ||
-              callStatus === CallStatus.FINISHED
-                ? "Call"
-                : ". . . "}
-            </span>
+            <span>{callStatus === CallStatus.CONNECTING ? ". . ." : "Call"}</span>
           </button>
         ) : (
-          <button className="btn-disconnect">End</button>
+          <button className="btn-disconnect" onClick={() => { leave(); setCallStatus(CallStatus.FINISHED); }}>
+            End
+          </button>
         )}
       </div>
     </>
   );
 };
+
+const Agent = ({ userName, userEmail, userId, type }: AgentProps) => {
+  const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
+
+  const token = process.env.NEXT_PUBLIC_VIDEOSDK_TOKEN || "";
+  const meetingId = process.env.NEXT_PUBLIC_VIDEOSDK_ROOM_ID || "";
+
+  return (
+    <MeetingProvider
+      config={{
+        meetingId,
+        micEnabled: true,
+        webcamEnabled: false,
+        name: userName,
+        mode: "SEND_AND_RECV",
+        debugMode: false,
+      }}
+      token={token}
+    >
+      <MeetingView 
+        userName={userName} 
+        callStatus={callStatus} 
+        setCallStatus={setCallStatus} 
+      />
+    </MeetingProvider>
+  );
+};
+
 export default Agent;
