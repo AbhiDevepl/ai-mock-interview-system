@@ -18,7 +18,6 @@ An intelligent mock interview platform powered by AI that helps users practice j
 | Language | TypeScript |
 | Styling | TailwindCSS + shadcn/ui |
 | Database | Supabase |
-| Voice AI | VAPI |
 | Forms | React Hook Form + Zod |
 | Notifications | Sonner |
 
@@ -29,7 +28,6 @@ An intelligent mock interview platform powered by AI that helps users practice j
 - Node.js 18+
 - npm/yarn/pnpm
 - Supabase account
-- VAPI account
 
 ### Installation
 
@@ -55,7 +53,6 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-NEXT_PUBLIC_VAPI_API_KEY=your_vapi_api_key
 ```
 
 ## Project Structure
@@ -80,6 +77,32 @@ NEXT_PUBLIC_VAPI_API_KEY=your_vapi_api_key
 | `npm run build` | Build for production |
 | `npm start` | Start production server |
 | `npm run lint` | Run ESLint |
+
+Environment Variables
+- Moved secrets to server-side only (.env)
+- Added VIDEOSDK_API_KEY, VIDEOSDK_SECRET_KEY, GOOGLE_GENERATIVE_AI_API_KEY
+- Removed NEXT_PUBLIC_VIDEOSDK_TOKEN exposure
+API Routes
+- /api/videosdk/create-room - Creates VideoSDK room
+- /api/videosdk/get-token - Generates JWT tokens securely
+- /api/interview/start - Initializes interview session
+- /api/interview/evaluate - AI evaluation with Gemini
+- /api/interview/session/[id] - Get/update session state
+Services & Hooks
+- lib/services/videosdk.service.ts
+- lib/services/interview.service.ts
+- lib/hooks/useVideoSDK.ts
+- lib/hooks/useInterview.ts
+Components
+- components/interview/InterviewSetup.tsx
+- components/interview/QuestionPanel.tsx
+- components/interview/FeedbackPanel.tsx
+- components/interview/ResultsPanel.tsx
+- components/interview/MeetingRoom.tsx
+Pages
+- /interview/setup - Configure interview
+- /interview/meeting/[sessionId] - Video + Q&A panel
+- /interview/results/[sessionId] - Final scores
 
 ## License
 

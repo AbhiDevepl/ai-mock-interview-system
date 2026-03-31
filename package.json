@@ -16,7 +16,6 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
-    "@vapi-ai/web": "^2.5.2",
     "@videosdk.live/react-sdk": "^0.8.0",
     "ai": "^6.0.35",
     "class-variance-authority": "^0.7.1",

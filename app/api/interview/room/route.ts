@@ -1,8 +1,7 @@
-// Simple GET endpoint that returns the room ID and token
-// so frontend can fetch them without exposing in client bundle
+import { NextResponse } from "next/server";
+
 export async function GET() {
-  return Response.json({
-    roomId: process.env.NEXT_PUBLIC_VIDEOSDK_ROOM_ID,
-    token: process.env.NEXT_PUBLIC_VIDEOSDK_TOKEN,
+  return NextResponse.json({
+    message: "Please use /api/videosdk/create-room to create a room",
   });
 }

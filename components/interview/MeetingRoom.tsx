@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { useMeeting, usePubSub } from "@videosdk.live/react-sdk";
 import { toast } from "sonner";
-import { MeetingProvider, useMeeting, useParticipant, usePubSub, Constants } from "@videosdk.live/react-sdk";
+import { Button } from "@/components/ui/button";
 
 enum CallStatus {
   INACTIVE = "INACTIVE",
@@ -13,18 +14,19 @@ enum CallStatus {
   FINISHED = "FINISHED",
 }
 
-interface AgentProps {
+interface MeetingRoomProps {
+  token: string;
+  roomId: string;
   userName: string;
-  userEmail?: string;
-  userId?: string;
-  type?: "generate" | "interview";
+  onLeave: () => void;
 }
 
-const MeetingView = ({ userName, callStatus, setCallStatus }: any) => {
+export function MeetingRoom({ token, roomId, userName, onLeave }: MeetingRoomProps) {
+  const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
   const [agentJoined, setAgentJoined] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
-  
+
   const { join, leave, participants } = useMeeting({
     onMeetingJoined: () => {
       setCallStatus(CallStatus.ACTIVE);
@@ -33,6 +35,7 @@ const MeetingView = ({ userName, callStatus, setCallStatus }: any) => {
     onMeetingLeft: () => {
       setCallStatus(CallStatus.FINISHED);
       toast.info("Left interview room");
+      onLeave();
     },
     onParticipantJoined: (participant) => {
       if (participant.displayName === "AI Interviewer") {
@@ -43,33 +46,39 @@ const MeetingView = ({ userName, callStatus, setCallStatus }: any) => {
     onParticipantLeft: (participant) => {
       if (participant.displayName === "AI Interviewer") {
         setAgentJoined(false);
-        setIsSpeaking(false);
+        setIsAgentSpeaking(false);
       }
     },
     onSpeakerChanged: (activeSpeakerId) => {
       if (activeSpeakerId) {
         const participant = participants.get(activeSpeakerId);
         if (participant?.displayName === "AI Interviewer") {
-          setIsSpeaking(true);
+          setIsAgentSpeaking(true);
         } else {
-          setIsSpeaking(false);
+          setIsAgentSpeaking(false);
         }
       } else {
-        setIsSpeaking(false);
+        setIsAgentSpeaking(false);
       }
-    }
+    },
   });
 
   usePubSub("CHAT", {
     onMessageReceived: (message) => {
-      setMessages((prev: string[]) => [...prev, message.message as string]);
-    }
+      setMessages((prev) => [...prev, message.message as string]);
+    },
   });
+
+  useEffect(() => {
+    if (callStatus === CallStatus.INACTIVE) {
+      join();
+    }
+  }, [callStatus, join]);
 
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : "";
 
   return (
-    <>
+    <div className="space-y-6 p-6">
       <div className="call-view">
         <div className="card-interviewer">
           <div className="avatar">
@@ -80,9 +89,15 @@ const MeetingView = ({ userName, callStatus, setCallStatus }: any) => {
               height={54}
               className="object-cover"
             />
-            {isSpeaking && <span className="animate-speak" />}
+            {isAgentSpeaking && <span className="animate-speak" />}
           </div>
           <h3>AI Interviewer</h3>
+          <span className={cn(
+            "text-xs px-2 py-0.5 rounded-full",
+            agentJoined ? "bg-green-500/20 text-green-500" : "bg-muted text-muted-foreground"
+          )}>
+            {agentJoined ? "Connected" : "Waiting..."}
+          </span>
         </div>
 
         <div className="card-border">
@@ -98,73 +113,30 @@ const MeetingView = ({ userName, callStatus, setCallStatus }: any) => {
           </div>
         </div>
       </div>
-      
+
       {lastMessage && (
         <div className="transcript-border">
           <div className="transcript">
-            <p
-              key={lastMessage}
-              className={cn(
-                "transition-opacity duration-500 opacity-0",
-                "animate-fadeIn opacity-100"
-              )}
-            >
-              {lastMessage}
-            </p>
+            <p className="animate-fadeIn">{lastMessage}</p>
           </div>
         </div>
       )}
 
-      <div className="w-full flex justify-center mt-4">
-        {callStatus !== CallStatus.ACTIVE ? (
-          <button 
-            className="btn-call relative" 
-            disabled={callStatus === CallStatus.CONNECTING}
-            onClick={() => { setCallStatus(CallStatus.CONNECTING); join(); }}
+      <div className="flex justify-center">
+        {callStatus !== CallStatus.FINISHED ? (
+          <button
+            className="btn-disconnect"
+            onClick={() => {
+              leave();
+              setCallStatus(CallStatus.FINISHED);
+            }}
           >
-             <span
-              className={cn(
-                "absolute animate-ping rounded-full opacity-75",
-                callStatus !== CallStatus.CONNECTING && "hidden"
-              )}
-            />
-            <span>{callStatus === CallStatus.CONNECTING ? ". . ." : "Call"}</span>
+            End Interview
           </button>
         ) : (
-          <button className="btn-disconnect" onClick={() => { leave(); setCallStatus(CallStatus.FINISHED); }}>
-            End
-          </button>
+          <Button onClick={onLeave}>Return to Results</Button>
         )}
       </div>
-    </>
+    </div>
   );
-};
-
-const Agent = ({ userName, userEmail, userId, type }: AgentProps) => {
-  const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
-
-  const token = process.env.NEXT_PUBLIC_VIDEOSDK_TOKEN || "";
-  const meetingId = process.env.NEXT_PUBLIC_VIDEOSDK_ROOM_ID || "";
-
-  return (
-    <MeetingProvider
-      config={{
-        meetingId,
-        micEnabled: true,
-        webcamEnabled: false,
-        name: userName,
-        mode: "SEND_AND_RECV",
-        debugMode: false,
-      }}
-      token={token}
-    >
-      <MeetingView 
-        userName={userName} 
-        callStatus={callStatus} 
-        setCallStatus={setCallStatus} 
-      />
-    </MeetingProvider>
-  );
-};
-
-export default Agent;
+}
