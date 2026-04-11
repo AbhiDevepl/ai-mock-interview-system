@@ -1,4 +1,0 @@
-#!/bin/bash
-set -e
-
-uv run interview_agent.py'
