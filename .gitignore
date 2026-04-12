@@ -138,3 +138,6 @@ __pycache__/
 venv/
 env/
 .venv/
+
+# Windows
+*Zone.Identifier
