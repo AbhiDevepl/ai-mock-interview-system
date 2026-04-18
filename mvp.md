@@ -6,7 +6,7 @@ Get the images and code for the following Stitch project's screens:
 
 ID: 6563262296834912621
 
-## Screens:
+## Screens: 
 1. Design System
     ID: asset-stub-assets-0b17d48113b44bb89c5638dee096823f-1776011105098
 
@@ -32,3 +32,14 @@ ID: 6563262296834912621
     ID: 83cecbe822f14deba5975ba81a369382
 
 Use a utility like `curl -L` to download the hosted URLs.
+
+
+
+
+let User = response.user 
+let name = User.display 
+let email = User.email
+const result = await axios.post(serverUrl + "/api/auth/google", {
+    name, email
+},{withCredentials: true})
+console.log(result)

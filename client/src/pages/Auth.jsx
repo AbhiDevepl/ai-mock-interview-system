@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import axios from "axios";
 import {
   auth,
   googleProvider,
@@ -17,6 +18,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
+
+const serverUrl = import.meta.env.VITE_SERVER_URL ?? "http://localhost:5000";
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 function cn(...inputs) {
@@ -415,7 +418,19 @@ function LoginForm() {
   const handleSocialLogin = async (provider, providerName) => {
     setSocialLoading(providerName);
     try {
-      await signInWithPopup(auth, provider);
+      const response = await signInWithPopup(auth, provider);
+      const User = response.user;
+      const name = User.displayName;
+      const email = User.email;
+
+      // Sync user with backend
+      const result = await axios.post(
+        serverUrl + "/api/auth/google",
+        { name, email },
+        { withCredentials: true }
+      );
+      console.log(result);
+
       toast.success(`Signed in with ${providerName}`, {
         description: "Welcome back to PrepWise!",
       });
@@ -583,7 +598,19 @@ function SignupForm() {
   const handleSocialLogin = async (provider, providerName) => {
     setSocialLoading(providerName);
     try {
-      await signInWithPopup(auth, provider);
+      const response = await signInWithPopup(auth, provider);
+      const User = response.user;
+      const name = User.displayName;
+      const email = User.email;
+
+      // Sync user with backend
+      const result = await axios.post(
+        serverUrl + "/api/auth/google",
+        { name, email },
+        { withCredentials: true }
+      );
+      console.log(result);
+
       toast.success(`Signed up with ${providerName}`, {
         description: "Welcome to PrepWise!",
       });
