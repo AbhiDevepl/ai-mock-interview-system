@@ -5,9 +5,22 @@ import Auth from './pages/Auth'
 
 
  // add production url in .env file and use it here demo of export const serverUrl = "import.meta.env.VITE_SERVER_URL"
-export const serverUrl = "http://localhost:8000/api/auth || http://localhost:8001/api/auth"
+export const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8001"
 
 const App = () => {
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const result = await axios.get(`${serverUrl}/api/user/current-user`, {
+          withCredentials: true
+        })
+        console.log(result.data)
+      } catch (error) {
+        console.log(error)
+      }
+    }
+    getUser()
+  }, []);
   return (
     <BrowserRouter>
     <Routes>

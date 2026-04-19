@@ -19,7 +19,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 
-const serverUrl = import.meta.env.VITE_SERVER_URL ?? "http://localhost:5000";
+const serverUrl = import.meta.env.VITE_SERVER_URL ?? "http://localhost:8000";
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 function cn(...inputs) {
@@ -422,7 +422,6 @@ function LoginForm() {
       const User = response.user;
       const name = User.displayName;
       const email = User.email;
-
       // Sync user with backend
       const result = await axios.post(
         serverUrl + "/api/auth/google",
