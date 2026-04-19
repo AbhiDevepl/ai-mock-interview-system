@@ -18,6 +18,8 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from "firebase/auth";
+import { useDispatch } from "react-redux";
+import { setUserData } from "../redux/userSlice";
 
 const serverUrl = import.meta.env.VITE_SERVER_URL ?? "http://localhost:8000";
 
@@ -428,7 +430,7 @@ function LoginForm() {
         { name, email },
         { withCredentials: true }
       );
-      console.log(result);
+      
 
       toast.success(`Signed in with ${providerName}`, {
         description: "Welcome back to PrepWise!",
@@ -608,12 +610,13 @@ function SignupForm() {
         { name, email },
         { withCredentials: true }
       );
-      console.log(result);
+      dispatch(setUserData(result.data))
 
       toast.success(`Signed up with ${providerName}`, {
         description: "Welcome to PrepWise!",
       });
     } catch (err) {
+      dispatch(setUserData(null))
       if (err.code !== "auth/popup-closed-by-user") {
         toast.error(`${providerName} sign up failed`, {
           description: firebaseErrorMessage(err.code),
@@ -810,7 +813,7 @@ function firebaseErrorMessage(code) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
-
+  const dispatch = useDispatch
   // Force dark mode — dark-only experience
   useEffect(() => {
     document.documentElement.classList.add("dark");
