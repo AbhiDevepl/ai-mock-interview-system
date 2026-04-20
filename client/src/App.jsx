@@ -10,7 +10,7 @@ import { useEffect } from 'react'
 
 
  // add production url in .env file and use it here demo of export const serverUrl = "import.meta.env.VITE_SERVER_URL"
-export const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8001"
+export const serverUrl = import.meta.env.VITE_SERVER_URL
 
 const App = () => {
 

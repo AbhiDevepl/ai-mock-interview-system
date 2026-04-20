@@ -10,10 +10,10 @@ const userSchema = new mongoose.Schema({
             required: true,
             unique: true
         },
-        // password: {
-        //     type: String,
-        //     required: true
-        // }
+        password: {
+            type: String,
+            required: true
+        },
         credits:{
             type:Number,
             default:100,

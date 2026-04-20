@@ -12,8 +12,8 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
     <Provider store={store}>
       <Routes>
-        <Route path="/" element={<Auth />} />
-        <Route path="/auth" element={<Home />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/auth" element={<Auth />} />
       </Routes>
     </Provider>
     </BrowserRouter>
