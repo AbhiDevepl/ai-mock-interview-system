@@ -29,7 +29,7 @@ const NavBar = () => {
                         className='bg-black text-white p-2 rounded-lg'
                         onClick={() => navigate("/")}
                     >
-                        <BsRobot size={18} />
+                        {<BsRobot size={18} /> ? <BsRobot size={18} /> : <Image src="assets/robot.png" alt="Robot" />}
                     </motion.div>
                     <h1 className='font-semibold hidden md:block text-lg'>AI Mock Interview</h1>
                 </div>
