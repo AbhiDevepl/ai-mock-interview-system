@@ -185,7 +185,7 @@ function LeftPanel() {
           <Icon name="psychology" size={20} fill={1} className="text-[#060e20]" />
         </div>
         <span className="text-xl font-bold tracking-tight" style={{ color: C.text }}>
-          PrepWise_AI
+          NextRound_AI
         </span>
       </div>
 
