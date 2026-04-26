@@ -66,7 +66,16 @@ web_modules/
 
 # Optional stylelint cache
 .stylelintcache
-
+# opencode node modules
+.opencode/node_modules
+.opencode/dist
+.opencode/build
+.opencode/coverage
+.opencode/logs
+.opencode/reports
+.opencode/tests
+.opencode/tests-results
+.opencode/tests-results-html
 # Microbundle cache
 .rpt2_cache/
 .rts2_cache_cjs/

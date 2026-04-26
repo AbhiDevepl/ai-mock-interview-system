@@ -5,13 +5,40 @@ import { BsRobot } from 'react-icons/bs';
 import { FaUserAstronaut } from 'react-icons/fa';
 import { FaCoins } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { setUserData } from "../redux/userSlice";
+import axios from "axios";
+import AuthModel from './AuthModel';
+import { auth } from "../utils/firebase";
+import { signOut } from "firebase/auth";
+
+const serverUrl = import.meta.env.VITE_SERVER_URL
+  ? import.meta.env.VITE_SERVER_URL.replace(/\/$/, "") + "/"
+  : "http://localhost:8000/";
+
+console.log("serverUrl (NavBar):", serverUrl);
 
 const NavBar = () => {
     const userData = useSelector((state) => state.user.userData);
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const [showCreditsPopup, setShowCreditsPopup] = useState(false);
     const [showUserPopup, setShowUserPopup] = useState(false);
     const credits = userData?.credits ?? 0;
+    const [showAuth, setShowAuth] = useState(false);
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            await axios.post(`${serverUrl}/api/auth/logout`);
+            dispatch(setUserData(null));
+            setShowCreditsPopup(false);
+            setShowUserPopup(false);
+            navigate("/");
+        } catch (error) {
+            console.log(error);
+        }
+    };
 
     return (
         <div className='bg-[#f3f3f3] flex justify-center items-center p-4'>
@@ -29,7 +56,7 @@ const NavBar = () => {
                         className='bg-black text-white p-2 rounded-lg'
                         onClick={() => navigate("/")}
                     >
-                        {<BsRobot size={18} /> ? <BsRobot size={18} /> : <Image src="assets/robot.png" alt="Robot" />}
+                        <BsRobot size={18} />
                     </motion.div>
                     <h1 className='font-semibold hidden md:block text-lg'>AI Mock Interview</h1>
                 </div>
@@ -39,8 +66,16 @@ const NavBar = () => {
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={() => setShowCreditsPopup(!showCreditsPopup)}
-                            className='hidden md:flex items-center gap-2 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-indigo-200 cursor-default'
+                            onClick={() => {
+                                if(!userData){
+                                    setShowAuth(true)
+                                    return;
+                                }
+                                
+                                setShowCreditsPopup(!showCreditsPopup);
+                                setShowUserPopup(false);
+                            }}
+                            className='hidden md:flex items-center gap-2 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-indigo-200'
                         >
                             <FaCoins />
                             <span className="font-semibold">{credits}</span>
@@ -68,7 +103,14 @@ const NavBar = () => {
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={() => setShowUserPopup(!showUserPopup)}
+                            onClick={() => {
+                                if(!userData){
+                                setShowAuth(true)
+                                return;
+                            }
+                            setShowUserPopup(!showUserPopup);
+                            setShowCreditsPopup(false);
+                            }}
                             className='relative bg-white p-2 rounded-full border-2 border-gray-200 group-hover:border-purple-400 transition-colors duration-300'
                         >
                             {userData ? (
@@ -79,16 +121,18 @@ const NavBar = () => {
                         </motion.button>
                         
                         {showUserPopup && (
-                            <div className="absolute right-0 mt-3 w-48 bg-white shadow-xl border border-gray-200 rounded-lg p-4 z-20">
+                            <div className="absolute right-0 mt-3 w-48 bg-white shadow-xl border border-gray-200 rounded-xl p-4 z-50">
                                 {userData ? (
                                     <>
-                                        <p className="text-sm text-gray-600 mb-4">{userData.name}</p>
+                                        <p className="text-md text-blue-500 font-semibold mb-1">{userData?.name}</p>
+                                        <button onClick={() => navigate("/history")}
+                                            className='w-full text-left text-sm py-2 hover:text-black 
+                                            text-gray-600'>
+                                                Interview History
+                                            </button>
                                         <button 
-                                            onClick={() => {
-                                                localStorage.removeItem("token");
-                                                navigate("/auth");
-                                            }}
-                                            className="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors duration-300 text-sm"
+                                            onClick={handleLogout}
+                                            className="w-full text-left text-sm py-2 flex items-center gap-2 text-red-500"
                                         >
                                             Logout
                                         </button>
@@ -110,6 +154,9 @@ const NavBar = () => {
                     </div>
                 </div>
             </motion.div>
+
+            {showAuth && <AuthModel onClose={() => setShowAuth(false)} />}
+
         </div>
     );
 };
