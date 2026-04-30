@@ -14,13 +14,12 @@ function Auth() {
       const response = await signInWithPopup(auth, provider);
       
       const user = response.user;
-      const payload = {
+
+      // Send verified user data from Firebase to our backend
+      const result = await axios.post(`${serverUrl}api/auth/google`, {
         name: user.displayName,
         email: user.email,
-        photo: user.photoURL 
-      };
-
-      const result = await axios.post(`${serverUrl}api/auth/google`, {
+      }, {
         withCredentials: true 
       });
 
