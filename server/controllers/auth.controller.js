@@ -16,16 +16,17 @@ export const googleAuth = async (req, res) => {
 
     let token = await genToken(user._id)
     res.cookie("token", token, {
-      http:true,
-      secure:false,
-      sameSite:"strict",
-      maxAge:7*24*60*60*1000
-    })
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     return res.status(200).json(user)
 
   } catch (error) {
-    return res.status(500).json({message:`Google Auth Error ${error}`})
+    console.error("Google Auth Error:", error);
+    return res.status(500).json({ message: "An error occurred during authentication" });
   }
 }
 
@@ -36,7 +37,8 @@ export const logOut = async (req, res)=> {
     await res.clearCookie("token")
     return res.status(200).json({message:"LogOut Successfully"})
   } catch (error) {
-    return res.status(500).json({message:`LogOut Error ${error}`})
+    console.error("Logout Error:", error);
+    return res.status(500).json({ message: "An error occurred during logout" });
   }
   
 }
