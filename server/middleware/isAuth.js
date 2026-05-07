@@ -12,13 +12,14 @@ const isAuth = (req, res, next) => {
         let verifyToken = jwt.verify(token, process.env.JWT_SECRET)
 
         if (!verifyToken) {
-            return res.status(401).json({message:"Invalid token or token expired"})
+            return res.status(401).json({message:"Authentication failed"})
         }
 
         req.userId = verifyToken.userId
         next()
     } catch (error) {
-        return res.status(500).json({message:`isAuth middleware error ${error.message}`})
+        console.error("isAuth middleware error:", error)
+        return res.status(500).json({message: "Internal Server Error"})
     }
 }
 
