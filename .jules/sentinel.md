@@ -1,0 +1,4 @@
+## 2025-05-15 - Insecure Cookie and Information Leakage in Auth Controllers
+**Vulnerability:** The authentication cookie used a typo `http: true` instead of `httpOnly: true`, making it accessible via client-side JavaScript. Additionally, Express error handlers leaked stack traces or error objects directly to the client via string interpolation in response messages.
+**Learning:** Typos in security configuration can completely negate the intended protection (like HttpOnly). Generic error messages are essential to prevent information disclosure about the server's internal state or library versions.
+**Prevention:** Use standardized security middleware if possible, or maintain a checklist for cookie configurations (`httpOnly`, `secure`, `sameSite`). Implement a centralized error handler that sanitizes responses for the client.
