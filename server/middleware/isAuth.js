@@ -1,25 +1,25 @@
 import jwt from "jsonwebtoken"
 
 const isAuth = (req, res, next) => {
-
     try {
-        let {token} = req.cookies
+        const { token } = req.cookies;
 
         if (!token) {
-            return res.status(401).json({message:"Please login to access this resource"})
+            return res.status(401).json({ message: "Authentication failed" });
         }
 
-        let verifyToken = jwt.verify(token, process.env.JWT_SECRET)
+        const verifyToken = jwt.verify(token, process.env.JWT_SECRET);
 
         if (!verifyToken) {
-            return res.status(401).json({message:"Invalid token or token expired"})
+            return res.status(401).json({ message: "Authentication failed" });
         }
 
-        req.userId = verifyToken.userId
-        next()
+        req.userId = verifyToken.userId;
+        next();
     } catch (error) {
-        return res.status(500).json({message:`isAuth middleware error ${error.message}`})
+        console.error("isAuth middleware error:", error.message);
+        return res.status(401).json({ message: "Authentication failed" });
     }
-}
+};
 
 export default isAuth
