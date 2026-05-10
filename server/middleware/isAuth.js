@@ -18,8 +18,10 @@ const isAuth = (req, res, next) => {
         req.userId = verifyToken.userId
         next()
     } catch (error) {
-        return res.status(500).json({message:`isAuth middleware error ${error.message}`})
+        console.error("isAuth middleware error:", error);
+        // Security: Use 401 for auth-related failures and avoid leaking details
+        return res.status(401).json({ message: "Authentication failed" });
     }
-}
+};
 
 export default isAuth
