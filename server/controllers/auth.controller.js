@@ -6,16 +6,18 @@ export const googleAuth = async (req, res) => {
   try {
     const { name, email, picture } = req.body;
 
-    // Security: Basic input validation to prevent NoSQL injection and ensure data integrity
-    if (typeof email !== 'string') {
+    // Security: Robust input validation to prevent NoSQL injection and ensure data integrity
+    if (typeof email !== 'string' || !email.trim() || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ message: "Invalid input" });
     }
 
-    let user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase();
+
+    let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       user = await User.create({
-        name,
-        email
+        name: name.trim(),
+        email: normalizedEmail
       });
     }
 

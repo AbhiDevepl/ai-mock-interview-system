@@ -5,3 +5,11 @@
 **Learning:** Typographical errors in security configurations can silently disable critical browser-level protections. Standardizing error responses is essential to prevent information disclosure that could assist an attacker in reconnaissance.
 
 **Prevention:** Always use `httpOnly`, `secure`, and `sameSite` attributes for sensitive cookies. Implement a centralized or standardized error handling pattern that logs details server-side but returns generic messages to the client.
+
+## 2025-05-20 - Global Error Handling and DoS Mitigation
+
+**Vulnerability:** The application was vulnerable to information leakage through unhandled exceptions and potential Denial-of-Service (DoS) attacks from large JSON payloads.
+
+**Learning:** Default Express configurations allow unlimited payload sizes and may leak stack traces for unhandled errors. A centralized error handler and explicit body limits are fundamental for production security.
+
+**Prevention:** Implement `express.json({ limit: '10kb' })` and a global error handling middleware that returns generic 500 responses while logging specifics server-side.
