@@ -1,20 +1,28 @@
 import genToken from "../config/token.js"
 import User from "../models/user.model.js"
+import admin from "../config/firebaseAdmin.js"
 
 
 export const googleAuth = async (req, res) => {
   try {
-    const { name, email, picture } = req.body;
+    const { idToken } = req.body;
 
-    // Security: Basic input validation to prevent NoSQL injection and ensure data integrity
-    if (typeof email !== 'string') {
-      return res.status(400).json({ message: "Invalid input" });
+    if (!idToken) {
+      return res.status(400).json({ message: "ID Token is required" });
+    }
+
+    // Security: Verify the Firebase ID token to ensure the request is from a legitimate user
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { email, name } = decodedToken;
+
+    if (!email) {
+      return res.status(400).json({ message: "Invalid token: email missing" });
     }
 
     let user = await User.findOne({ email });
     if (!user) {
       user = await User.create({
-        name,
+        name: name || email.split('@')[0],
         email
       });
     }

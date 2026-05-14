@@ -14,13 +14,12 @@ function Auth() {
       const response = await signInWithPopup(auth, provider);
       
       const user = response.user;
-      const payload = {
-        name: user.displayName,
-        email: user.email,
-        photo: user.photoURL 
-      };
+      const idToken = await user.getIdToken();
 
+      // Security: Sending verified ID token instead of raw user data
       const result = await axios.post(`${serverUrl}api/auth/google`, {
+        idToken
+      }, {
         withCredentials: true 
       });
 
@@ -53,9 +52,9 @@ function Auth() {
           </span>
         </h1>
 
-        <p className="text-gray-500 text-center text-sm md:text-base leading-relaxed mb-8">
+        <h2 className="text-gray-500 text-center text-sm md:text-base leading-relaxed mb-8">
           Sign in to start AI-powered mock interviews, track your progress, and unlock detailed performance insights.
-        </p>
+        </h2>
 
         <motion.button
           onClick={handleGoogleAuth}
