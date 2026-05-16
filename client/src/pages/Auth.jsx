@@ -20,7 +20,9 @@ function Auth() {
         photo: user.photoURL 
       };
 
-      const result = await axios.post(`${serverUrl}api/auth/google`, {
+      // TODO: Replace client-side payload with Firebase ID token verification on the backend
+      // for improved security and to prevent authentication bypass.
+      const result = await axios.post(`${serverUrl}api/auth/google`, payload, {
         withCredentials: true 
       });
 
