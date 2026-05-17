@@ -10,6 +10,9 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  picture: {
+    type: String,
+  },
   credits: {
     type: Number,
     default: 100,
