@@ -20,7 +20,7 @@ function Auth() {
         photo: user.photoURL 
       };
 
-      const result = await axios.post(`${serverUrl}api/auth/google`, {
+      const result = await axios.post(`${serverUrl}api/auth/google`, payload, {
         withCredentials: true 
       });
 
