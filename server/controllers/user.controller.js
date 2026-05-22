@@ -9,7 +9,9 @@ export const getCurrentUser = async (req, res) => {
         }
         return res.status(200).json(user)
     } catch (error) {
-        return res.status(500).json({message:`Failed to get current user ${error.message}`})
+        console.error("getCurrentUser error:", error);
+        // Security: Do not leak internal error details to the client
+        return res.status(500).json({message: "Internal Server Error"});
     }
     
 }
