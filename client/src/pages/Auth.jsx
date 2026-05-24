@@ -14,15 +14,12 @@ function Auth() {
       const response = await signInWithPopup(auth, provider);
       
       const user = response.user;
-      const payload = {
-        name: user.displayName,
-        email: user.email,
-        photo: user.photoURL 
-      };
+      const idToken = await user.getIdToken();
 
-      const result = await axios.post(`${serverUrl}api/auth/google`, {
-        withCredentials: true 
-      });
+      const result = await axios.post(`${serverUrl}api/auth/google`,
+        { idToken },
+        { withCredentials: true }
+      );
 
       console.log("Server Response:", result.data);
       
