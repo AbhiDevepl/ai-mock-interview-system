@@ -1,22 +1,48 @@
 import genToken from "../config/token.js"
 import User from "../models/user.model.js"
+import admin from "../config/firebase.js"
 
 
 export const googleAuth = async (req, res) => {
   try {
-    const { name, email, picture } = req.body;
+    const { idToken } = req.body;
 
-    // Security: Basic input validation to prevent NoSQL injection and ensure data integrity
-    if (typeof email !== 'string') {
-      return res.status(400).json({ message: "Invalid input" });
+    if (!idToken) {
+      return res.status(400).json({ message: "ID Token is required" });
     }
 
-    let user = await User.findOne({ email });
+    // Security: Verify identity using Firebase Admin SDK
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email, name, picture } = decodedToken;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email not found in token" });
+    }
+
+    let user = await User.findOne({ firebaseUID: uid });
+
+    // Migration logic: If user not found by UID, check by email to link existing account
     if (!user) {
-      user = await User.create({
-        name,
-        email
-      });
+      user = await User.findOne({ email });
+      if (user) {
+        user.firebaseUID = uid;
+        if (picture) user.avatar = picture;
+        await user.save();
+      } else {
+        // Create new user if neither UID nor email exists
+        user = await User.create({
+          firebaseUID: uid,
+          name: name || email.split('@')[0],
+          email,
+          avatar: picture
+        });
+      }
+    } else {
+      // Update avatar if it has changed or was missing
+      if (picture && user.avatar !== picture) {
+        user.avatar = picture;
+        await user.save();
+      }
     }
 
     let token = await genToken(user._id);
