@@ -1,22 +1,38 @@
 import genToken from "../config/token.js"
 import User from "../models/user.model.js"
+import admin from "../config/firebase.js"
 
 
 export const googleAuth = async (req, res) => {
   try {
-    const { name, email, picture } = req.body;
+    const { idToken } = req.body;
 
-    // Security: Basic input validation to prevent NoSQL injection and ensure data integrity
-    if (typeof email !== 'string') {
-      return res.status(400).json({ message: "Invalid input" });
+    if (!idToken) {
+      return res.status(400).json({ message: "Missing ID token" });
     }
 
-    let user = await User.findOne({ email });
+    // Verify Firebase ID token server-side
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const { uid, email, name, picture } = decodedToken;
+
+    let user = await User.findOne({ firebaseUID: uid });
+
     if (!user) {
-      user = await User.create({
-        name,
-        email
-      });
+      // Fallback to email if user exists but doesn't have firebaseUID yet (migration)
+      user = await User.findOne({ email });
+
+      if (user) {
+        user.firebaseUID = uid;
+        if (picture) user.photoURL = picture;
+        await user.save();
+      } else {
+        user = await User.create({
+          name: name || email.split('@')[0],
+          email,
+          firebaseUID: uid,
+          photoURL: picture
+        });
+      }
     }
 
     let token = await genToken(user._id);
