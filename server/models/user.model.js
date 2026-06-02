@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  firebaseUID: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  photoURL: {
+    type: String,
+  },
   credits: {
     type: Number,
     default: 100,

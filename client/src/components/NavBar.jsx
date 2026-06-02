@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { BsRobot } from 'react-icons/bs';
 import { FaUserAstronaut } from 'react-icons/fa';
 import { FaCoins } from "react-icons/fa6";
