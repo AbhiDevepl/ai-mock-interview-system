@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/connectDB.js';
 import cookieParser from 'cookie-parser';
 import cors from "cors"
+import helmet from 'helmet';
 import authRouter from './routers/auth.route.js';
 import userRouter from './routers/user.route.js';
 dotenv.config();
@@ -13,6 +14,7 @@ const corsOptions = {
   credentials: true,
 };
 console.log("CORS origin:", corsOptions.origin);
+app.use(helmet());
 app.use(cors(corsOptions));
 
 app.use(express.json())
