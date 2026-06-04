@@ -1,3 +1,10 @@
+## 2026-05-15 - Authentication Bypass in Google Auth
+
+**Vulnerability:** The `googleAuth` controller in `server/controllers/auth.controller.js` was trusting user-provided email and name from `req.body` without any server-side verification. This allowed an attacker to impersonate any user by simply providing their email address in the request.
+
+**Learning:** Client-side authentication (like Firebase on the frontend) must always be complemented by server-side verification of identity tokens. Trusting the frontend for user identity is a critical security flaw.
+
+**Prevention:** Always require and verify a cryptographically signed identity token (e.g., Firebase ID token) on the backend using the appropriate SDK (e.g., `firebase-admin`). Extract user information directly from the verified token payload rather than the request body.
 ## 2025-05-15 - Insecure Cookie Configuration and Information Leakage
 
 **Vulnerability:** The JWT authentication cookie was incorrectly configured with a typo (`http: true` instead of `httpOnly: true`) and was missing the `secure` flag. This left the token vulnerable to XSS and insecure transmission. Furthermore, the authentication middleware and controllers leaked detailed internal error messages and stack traces to the client.
