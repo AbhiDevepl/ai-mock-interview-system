@@ -1,21 +1,39 @@
 import genToken from "../config/token.js"
 import User from "../models/user.model.js"
+import admin from "../config/firebaseAdmin.js"
 
 
 export const googleAuth = async (req, res) => {
   try {
-    const { name, email, picture } = req.body;
+    const { idToken, name, photo } = req.body;
 
-    // Security: Basic input validation to prevent NoSQL injection and ensure data integrity
-    if (typeof email !== 'string') {
-      return res.status(400).json({ message: "Invalid input" });
+    if (!idToken) {
+      return res.status(400).json({ message: "ID Token is required" });
+    }
+
+    // Verify the ID token using Firebase Admin SDK
+    let decodedToken;
+    try {
+      decodedToken = await admin.auth().verifyIdToken(idToken);
+      if (!decodedToken) {
+        throw new Error("No decoded token returned");
+      }
+    } catch (error) {
+      console.error("Firebase ID Token Verification Error:", error);
+      return res.status(401).json({ message: "Invalid or expired ID Token" });
+    }
+
+    const email = decodedToken.email;
+    if (!email) {
+      return res.status(400).json({ message: "Email not found in token" });
     }
 
     let user = await User.findOne({ email });
     if (!user) {
       user = await User.create({
-        name,
-        email
+        name: decodedToken.name || name,
+        email,
+        picture: decodedToken.picture || photo
       });
     }
 
@@ -38,7 +56,11 @@ export const googleAuth = async (req, res) => {
 
 export const logOut = async (req, res) => {
   try {
-    await res.clearCookie("token");
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict"
+    });
     return res.status(200).json({ message: "LogOut Successfully" });
   } catch (error) {
     console.error("LogOut Error:", error);
