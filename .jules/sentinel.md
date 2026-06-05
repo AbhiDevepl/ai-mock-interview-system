@@ -12,3 +12,11 @@
 **Learning:** Typographical errors in security configurations can silently disable critical browser-level protections. Standardizing error responses is essential to prevent information disclosure that could assist an attacker in reconnaissance.
 
 **Prevention:** Always use `httpOnly`, `secure`, and `sameSite` attributes for sensitive cookies. Implement a centralized or standardized error handling pattern that logs details server-side but returns generic messages to the client.
+
+## 2026-05-15 - Helmet COOP and Google Auth Compatibility
+
+**Vulnerability:** Default security headers from `helmet` can break essential third-party integrations like Google Identity Services due to restrictive `Cross-Origin-Opener-Policy` (COOP) settings.
+
+**Learning:** `helmet` v8+ enables `COOP: same-origin` by default, which prevents the window communication required for Google Auth popups.
+
+**Prevention:** When using Google Auth or similar popup-based authentication, configure `helmet` with `crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }` to maintain security without breaking functionality.
