@@ -30,7 +30,7 @@ const NavBar = () => {
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            await axios.post(`${serverUrl}/api/auth/logout`);
+            await axios.post(`${serverUrl}api/auth/logout`);
             dispatch(setUserData(null));
             setShowCreditsPopup(false);
             setShowUserPopup(false);
