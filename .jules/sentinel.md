@@ -12,3 +12,11 @@
 **Learning:** Typographical errors in security configurations can silently disable critical browser-level protections. Standardizing error responses is essential to prevent information disclosure that could assist an attacker in reconnaissance.
 
 **Prevention:** Always use `httpOnly`, `secure`, and `sameSite` attributes for sensitive cookies. Implement a centralized or standardized error handling pattern that logs details server-side but returns generic messages to the client.
+
+## 2026-06-10 - API Contract Mismatch and Information Disclosure
+
+**Vulnerability:** The logout route was configured as a `GET` request in the backend while the frontend attempted a `POST` request, leading to potential CSRF risks if downgraded and functional inconsistency. Additionally, the `getCurrentUser` endpoint leaked raw database error messages to the client.
+
+**Learning:** Authentication state changes (like logout) should always use non-idempotent methods like `POST` to prevent pre-fetching or simple link-based CSRF. Inconsistent API contracts between frontend and backend can hide security misconfigurations.
+
+**Prevention:** Ensure all state-changing routes use `POST`, `PUT`, or `DELETE`. Audit all error handlers to ensure they log internally but respond with generic messages to prevent reconnaissance via information leakage.
