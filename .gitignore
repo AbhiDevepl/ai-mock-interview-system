@@ -51,6 +51,9 @@ client/dist/
 server/dist/
 
 .env
+*.firebase.json
+server/*.firebase.json
+server/perpwise-ai-firebase.json
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/

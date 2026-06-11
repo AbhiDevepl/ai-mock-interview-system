@@ -1,9 +1,10 @@
-import express from "express"
-import { getCurrentUser } from "../controllers/user.controller.js"
-import isAuth from "../middleware/isAuth.js"
- 
-const userRouter = express.Router()
+import express from "express";
+import { getCurrentUser } from "../controllers/user.controller.js";
+import isAuth from "../middleware/isAuth.js";
+import { sessionLimiter } from "../middleware/rateLimiter.js";
 
-userRouter.get("/current-user", isAuth, getCurrentUser)
+const userRouter = express.Router();
 
-export default userRouter
+userRouter.get("/current-user", sessionLimiter, isAuth, getCurrentUser);
+
+export default userRouter;

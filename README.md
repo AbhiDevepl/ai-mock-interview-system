@@ -37,8 +37,11 @@ Follow these instructions to get a copy of the project up and running on your lo
 ### Prerequisites
 
 *   **Node.js** (v18+ recommended)
+*   **npm** (bundled with Node.js)
 *   **MongoDB** database (Local instance or MongoDB Atlas cluster)
 *   **Firebase Project** setup (for authentication credentials)
+
+This project uses npm only. Run commands separately inside `client/` and `server/`; there is no package-manager workspace configuration.
 
 ### 1. Clone the repository
 
@@ -73,6 +76,14 @@ npm run dev
 
 The backend should now be running on `http://localhost:5000`.
 
+For production, install production dependencies and start the server with:
+
+```bash
+cd server
+npm install --omit=dev
+npm start
+```
+
 ### 3. Frontend Setup
 
 Open another terminal and navigate to the frontend directory:
@@ -100,6 +111,61 @@ npm run dev
 ```
 
 The application should now be accessible at `http://localhost:5173`.
+
+Build the frontend for production:
+
+```bash
+cd client
+npm install
+npm run build
+```
+
+Preview a production build locally:
+
+```bash
+cd client
+npm run preview
+```
+
+## 🧪 Testing
+
+No automated test suite is currently defined.
+
+```bash
+cd server
+npm test
+```
+
+The server test script currently exits with `Error: no test specified`.
+
+```bash
+cd client
+npm run lint
+```
+
+The client has linting configured through npm. There is no `npm test` script in `client/package.json`.
+
+## 📦 NPM Command Reference
+
+### Client
+
+```bash
+cd client
+npm install
+npm run dev
+npm run build
+npm run lint
+```
+
+### Server
+
+```bash
+cd server
+npm install
+npm run dev
+npm start
+npm test
+```
 
 ## 📂 Project Structure
 

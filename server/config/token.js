@@ -1,17 +1,23 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
-const genToken = (userId) => {
-    try {
-        // Generates a synchronous token
-        const token = jwt.sign({ userId }, process.env.JWT_SECRET, {
-            expiresIn: "7d",
-        });
-        return token;
-    } catch (error) {
-        console.error("JWT Generation Error:", error);
-        // Re-throwing allows the calling function to handle the failure
-        throw new Error("Failed to generate authentication token");
-    }
-};
+export function genToken(userId, role = "user") {
+  const jti = crypto.randomUUID();
+  const token = jwt.sign({ userId, role, jti }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+  return token;
+}
 
-export default genToken;
+export function verifyToken(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { valid: true, decoded };
+  } catch (error) {
+    if (error.name === "TokenExpiredError")
+      return { valid: false, reason: "expired" };
+    if (error.name === "JsonWebTokenError")
+      return { valid: false, reason: "invalid" };
+    return { valid: false, reason: "error" };
+  }
+}
