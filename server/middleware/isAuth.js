@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { logAuthEvent } from "../config/logger.js";
-import { getRedisClient } from "../config/redis.js";
+import { isJtiBlacklisted, getSession } from "../services/session.service.js";
 
 const isAuth = async (req, res, next) => {
   try {
@@ -13,26 +13,21 @@ const isAuth = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { userId, role, jti } = decoded;
 
-    const redisClient = getRedisClient();
-    if (redisClient) {
-      const [isTokenBlacklisted, isUserBlacklisted] = await Promise.all([
-        redisClient.get(`blacklist:token:${decoded.jti}`),
-        redisClient.get(`blacklist:user:${decoded.userId}`),
-      ]);
-
-      if (isTokenBlacklisted || isUserBlacklisted) {
-        logAuthEvent("TOKEN_INVALID", req, {
-          userId: decoded.userId,
-          metadata: { reason: "Session revoked" },
-        });
-        return res.status(401).json({ message: "Session revoked." });
-      }
+    const blacklisted = await isJtiBlacklisted(jti);
+    if (blacklisted) {
+      logAuthEvent("TOKEN_INVALID", req, {
+        userId,
+        metadata: { reason: "Session revoked (blacklisted)", jti },
+      });
+      return res.status(401).json({ message: "Session revoked." });
     }
 
-    req.userId = decoded.userId;
-    req.userRole = decoded.role || "user";
+    req.userId = userId;
+    req.userRole = role || "user";
     req.token = token;
+    req.jti = jti;
 
     next();
   } catch (error) {
@@ -54,22 +49,20 @@ const isAuth = async (req, res, next) => {
   }
 };
 
-/**
- * Optional auth middleware — attempts to authenticate from cookie
- * but never blocks the request. Sets req.userId, req.userRole and
- * req.token when a valid token is present.
- */
 export const optionalAuth = async (req, res, next) => {
   try {
     const token = req.cookies?.token;
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.userId = decoded.userId;
-      req.userRole = decoded.role || "user";
-      req.token = token;
+      const blacklisted = await isJtiBlacklisted(decoded.jti);
+      if (!blacklisted) {
+        req.userId = decoded.userId;
+        req.userRole = decoded.role || "user";
+        req.token = token;
+        req.jti = decoded.jti;
+      }
     }
   } catch {
-    // Ignore — auth is optional for this route
   }
   next();
 };

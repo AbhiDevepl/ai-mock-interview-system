@@ -37,14 +37,15 @@ const start = async () => {
   try {
     await connectDB();
 
-    try {
-      await connectRedis();
-    } catch (redisError) {
+    // Fire Redis connection in parallel — non-critical for startup
+    // Server starts immediately; Redis handles its own reconnection
+    // getRedisClient() gracefully returns null if unavailable
+    connectRedis().catch((err) => {
       console.warn(
         "Redis unavailable — server will proceed without Redis:",
-        redisError.message,
+        err.message,
       );
-    }
+    });
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
