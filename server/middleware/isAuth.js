@@ -16,10 +16,11 @@ const isAuth = async (req, res, next) => {
 
     const redisClient = getRedisClient();
     if (redisClient) {
-      const [isTokenBlacklisted, isUserBlacklisted] = await Promise.all([
-        redisClient.get(`blacklist:token:${decoded.jti}`),
-        redisClient.get(`blacklist:user:${decoded.userId}`),
-      ]);
+      // Use MGET to fetch both blacklist statuses in a single round-trip to Redis
+      const [isTokenBlacklisted, isUserBlacklisted] = await redisClient.mget(
+        `blacklist:token:${decoded.jti}`,
+        `blacklist:user:${decoded.userId}`,
+      );
 
       if (isTokenBlacklisted || isUserBlacklisted) {
         logAuthEvent("TOKEN_INVALID", req, {

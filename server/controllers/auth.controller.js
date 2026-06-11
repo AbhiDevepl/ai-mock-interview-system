@@ -1,25 +1,14 @@
 import jwt from "jsonwebtoken";
-import User from "../models/user.model.js";
+import User, { USER_PUBLIC_FIELDS } from "../models/user.model.js";
 import { admin } from "../config/firebaseAdmin.js";
 import { genToken } from "../config/token.js";
 import { getRedisClient } from "../config/redis.js";
 import { TOKEN_COOKIE_OPTIONS, COOKIE_OPTIONS } from "../config/cookie.js";
 import { logAuthEvent } from "../config/logger.js";
 
-const USER_DATA_FIELDS = [
-  "_id",
-  "name",
-  "email",
-  "picture",
-  "credits",
-  "role",
-  "lastLoginAt",
-  "createdAt",
-];
-
 function sanitizeUser(user) {
   const data = {};
-  for (const field of USER_DATA_FIELDS) {
+  for (const field of USER_PUBLIC_FIELDS) {
     data[field] = user[field];
   }
   return data;
@@ -139,7 +128,10 @@ export const getMe = async (req, res) => {
   try {
     const { userId } = req;
 
-    const user = await User.findById(userId);
+    // Use .lean() and .select() to optimize read performance and reduce payload
+    const user = await User.findById(userId)
+      .select([...USER_PUBLIC_FIELDS, "isActive"].join(" "))
+      .lean();
 
     if (!user || !user.isActive) {
       res.clearCookie("token", COOKIE_OPTIONS);

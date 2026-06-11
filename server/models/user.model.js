@@ -1,5 +1,16 @@
 import mongoose from "mongoose";
 
+export const USER_PUBLIC_FIELDS = [
+  "_id",
+  "name",
+  "email",
+  "picture",
+  "credits",
+  "role",
+  "lastLoginAt",
+  "createdAt",
+];
+
 const userSchema = new mongoose.Schema(
   {
     name: {

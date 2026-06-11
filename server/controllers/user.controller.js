@@ -1,8 +1,12 @@
-import User from "../models/user.model.js";
+import User, { USER_PUBLIC_FIELDS } from "../models/user.model.js";
 
 export const getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
+    // Use .lean() and .select() to optimize read performance and reduce payload
+    const user = await User.findById(req.userId)
+      .select([...USER_PUBLIC_FIELDS, "isActive"].join(" "))
+      .lean();
+
     if (!user || !user.isActive) {
       return res.status(401).json({ message: "Authentication required." });
     }
