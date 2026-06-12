@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { logAuthEvent } from "../config/logger.js";
 import { isJtiBlacklisted, getSession } from "../services/session.service.js";
+import { COOKIE_OPTIONS } from "../config/cookie.js";
 
 const isAuth = async (req, res, next) => {
   try {
@@ -35,6 +36,7 @@ const isAuth = async (req, res, next) => {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },
       });
+      res.clearCookie("token", COOKIE_OPTIONS);
       return res
         .status(401)
         .json({ message: "Session expired. Please log in again." });
@@ -43,6 +45,7 @@ const isAuth = async (req, res, next) => {
       logAuthEvent("TOKEN_INVALID", req, {
         metadata: { error: error.message },
       });
+      res.clearCookie("token", COOKIE_OPTIONS);
       return res.status(401).json({ message: "Invalid authentication token." });
     }
     return res.status(500).json({ message: "Authentication error." });

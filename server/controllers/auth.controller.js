@@ -52,10 +52,17 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, uid: firebaseUID } = decodedToken;
+    const { email, uid: firebaseUID, email_verified } = decodedToken;
 
     if (!email) {
       return res.status(401).json({ message: "Authentication failed." });
+    }
+
+    if (!email_verified) {
+      logAuthEvent("LOGIN_FAILURE", req, {
+        metadata: { error: "Email not verified", email },
+      });
+      return res.status(401).json({ message: "Authentication failed. Please verify your email." });
     }
 
     const blocked = await isLoginBlocked(email);
@@ -110,7 +117,6 @@ export const googleAuth = async (req, res) => {
     res.cookie("deviceId", deviceId, {
       ...COOKIE_OPTIONS,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: false,
     });
 
     logAuthEvent(isNewUser ? "USER_CREATED" : "LOGIN_SUCCESS", req, {
@@ -150,7 +156,7 @@ export const logOut = async (req, res) => {
     }
 
     res.clearCookie("token", COOKIE_OPTIONS);
-    res.clearCookie("deviceId", { ...COOKIE_OPTIONS, httpOnly: false });
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
 
     if (req.userId) {
       logAuthEvent("LOGOUT", req, { userId: req.userId });
