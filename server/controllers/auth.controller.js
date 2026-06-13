@@ -52,10 +52,13 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, uid: firebaseUID } = decodedToken;
+    const { email, uid: firebaseUID, email_verified } = decodedToken;
 
-    if (!email) {
-      return res.status(401).json({ message: "Authentication failed." });
+    if (!email || !email_verified) {
+      logAuthEvent("LOGIN_FAILURE", req, {
+        metadata: { error: "Email not verified or missing" },
+      });
+      return res.status(401).json({ message: "Authentication failed. Please verify your email." });
     }
 
     const blocked = await isLoginBlocked(email);
