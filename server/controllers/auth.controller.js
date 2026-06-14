@@ -52,10 +52,23 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, uid: firebaseUID } = decodedToken;
+    const {
+      email,
+      uid: firebaseUID,
+      email_verified,
+      name: tokenName,
+      picture: tokenPhoto,
+    } = decodedToken;
 
     if (!email) {
       return res.status(401).json({ message: "Authentication failed." });
+    }
+
+    if (!email_verified) {
+      logAuthEvent("LOGIN_FAILURE", req, {
+        metadata: { error: "Email not verified", email },
+      });
+      return res.status(401).json({ message: "Authentication failed. Email not verified." });
     }
 
     const blocked = await isLoginBlocked(email);
@@ -73,15 +86,18 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: tokenName || name || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: tokenPhoto || photo || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      // Update profile from token (priority) or request body
+      if (tokenPhoto || photo) user.picture = tokenPhoto || photo;
+      if (tokenName || name) user.name = tokenName || name;
+
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
       if (!user.isActive) {
