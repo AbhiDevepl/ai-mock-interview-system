@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { logAuthEvent } from "../config/logger.js";
 import { isJtiBlacklisted, getSession } from "../services/session.service.js";
+import { COOKIE_OPTIONS } from "../config/cookie.js";
 
 const isAuth = async (req, res, next) => {
   try {
@@ -17,6 +18,7 @@ const isAuth = async (req, res, next) => {
 
     const blacklisted = await isJtiBlacklisted(jti);
     if (blacklisted) {
+      res.clearCookie("token", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session revoked (blacklisted)", jti },
@@ -31,6 +33,7 @@ const isAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
+    res.clearCookie("token", COOKIE_OPTIONS);
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },

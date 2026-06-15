@@ -52,9 +52,22 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, uid: firebaseUID } = decodedToken;
+    const {
+      email,
+      uid: firebaseUID,
+      email_verified,
+      name: verifiedName,
+      picture: verifiedPicture,
+    } = decodedToken;
 
-    if (!email) {
+    // Security: Ensure the email is present and has been verified by the provider
+    // to prevent authentication bypass via unverified accounts.
+    if (!email || !email_verified) {
+      logAuthEvent("LOGIN_FAILURE", req, {
+        metadata: {
+          error: !email ? "No email in token" : "Email not verified",
+        },
+      });
       return res.status(401).json({ message: "Authentication failed." });
     }
 
@@ -73,15 +86,18 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        // Security: Prioritize verified claims from the ID token over client-provided data
+        // to prevent profile data manipulation or identity spoofing.
+        name: verifiedName || name || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: verifiedPicture || photo || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      if (verifiedName) user.name = verifiedName;
+      if (verifiedPicture) user.picture = verifiedPicture;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
       if (!user.isActive) {
@@ -108,9 +124,8 @@ export const googleAuth = async (req, res) => {
 
     res.cookie("token", token, TOKEN_COOKIE_OPTIONS);
     res.cookie("deviceId", deviceId, {
-      ...COOKIE_OPTIONS,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: false,
+      ...TOKEN_COOKIE_OPTIONS,
+      httpOnly: true,
     });
 
     logAuthEvent(isNewUser ? "USER_CREATED" : "LOGIN_SUCCESS", req, {
@@ -150,7 +165,7 @@ export const logOut = async (req, res) => {
     }
 
     res.clearCookie("token", COOKIE_OPTIONS);
-    res.clearCookie("deviceId", { ...COOKIE_OPTIONS, httpOnly: false });
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
 
     if (req.userId) {
       logAuthEvent("LOGOUT", req, { userId: req.userId });
