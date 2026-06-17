@@ -14,6 +14,20 @@ const isAuth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { userId, role, jti } = decoded;
+    const deviceId = req.cookies?.deviceId;
+
+    if (!deviceId) {
+      return res.status(401).json({ message: "Invalid session." });
+    }
+
+    const session = await getSession(userId, deviceId);
+    if (!session || session.jti !== jti) {
+      logAuthEvent("TOKEN_INVALID", req, {
+        userId,
+        metadata: { reason: "Session invalid or mismatch", jti, deviceId },
+      });
+      return res.status(401).json({ message: "Session invalid or expired." });
+    }
 
     const blacklisted = await isJtiBlacklisted(jti);
     if (blacklisted) {
