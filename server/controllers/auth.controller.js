@@ -110,7 +110,7 @@ export const googleAuth = async (req, res) => {
     res.cookie("deviceId", deviceId, {
       ...COOKIE_OPTIONS,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: false,
+      httpOnly: true,
     });
 
     logAuthEvent(isNewUser ? "USER_CREATED" : "LOGIN_SUCCESS", req, {
@@ -150,7 +150,7 @@ export const logOut = async (req, res) => {
     }
 
     res.clearCookie("token", COOKIE_OPTIONS);
-    res.clearCookie("deviceId", { ...COOKIE_OPTIONS, httpOnly: false });
+    res.clearCookie("deviceId", { ...COOKIE_OPTIONS, httpOnly: true });
 
     if (req.userId) {
       logAuthEvent("LOGOUT", req, { userId: req.userId });
