@@ -52,9 +52,12 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, uid: firebaseUID } = decodedToken;
+    const { email, email_verified, uid: firebaseUID } = decodedToken;
 
-    if (!email) {
+    if (!email || !email_verified) {
+      logAuthEvent("LOGIN_FAILURE", req, {
+        metadata: { error: !email ? "No email in token" : "Email not verified", email },
+      });
       return res.status(401).json({ message: "Authentication failed." });
     }
 
@@ -110,7 +113,6 @@ export const googleAuth = async (req, res) => {
     res.cookie("deviceId", deviceId, {
       ...COOKIE_OPTIONS,
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      httpOnly: false,
     });
 
     logAuthEvent(isNewUser ? "USER_CREATED" : "LOGIN_SUCCESS", req, {
@@ -150,7 +152,7 @@ export const logOut = async (req, res) => {
     }
 
     res.clearCookie("token", COOKIE_OPTIONS);
-    res.clearCookie("deviceId", { ...COOKIE_OPTIONS, httpOnly: false });
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
 
     if (req.userId) {
       logAuthEvent("LOGOUT", req, { userId: req.userId });
