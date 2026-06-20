@@ -14,6 +14,8 @@ import {
 } from "./redux/userSlice";
 import { setupAxiosInterceptors } from "./utils/axios";
 
+export const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
+
 function App() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
