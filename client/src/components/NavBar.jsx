@@ -44,7 +44,7 @@ const NavBar = () => {
         initial={{ opacity: 0, y: -40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-6xl bg-white rounded-[24px] shadow-sm
+        className="w-full max-w-6xl bg-white rounded-24px shadow-sm
                            border-2 border-gray-200 px-8 py-4 flex justify-between items-center relative mx-auto"
       >
         <div className="flex items-center gap-3 cursor-pointer">
@@ -75,7 +75,8 @@ const NavBar = () => {
                 setShowCreditsPopup(!showCreditsPopup);
                 setShowUserPopup(false);
               }}
-              className="hidden md:flex items-center gap-2 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-800 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-indigo-200"
+              className="hidden md:flex items-center gap-2 bg-gradient-to from-indigo-100 to-purple-100
+                        text-indigo-800 px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-indigo-200"
             >
               <FaCoins />
               <span className="font-semibold">{credits}</span>
