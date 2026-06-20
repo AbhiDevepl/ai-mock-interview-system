@@ -1,170 +1,66 @@
 # AGENTS.md
 
-## Project Overview
+## Project
 
-AI Mock Interview System — React (Vite) frontend + Express backend monorepo.
-
-Auth: Firebase (Google OAuth) → server-side ID token verification via Firebase Admin SDK → JWT cookie session + MongoDB user storage.
-
----
-
-## Repo Structure
-
-```
-ai-mock-interview-system/
-├── client/                 # React 19 + Vite frontend
-│   ├── src/
-│   │   ├── components/     # AuthModel.jsx, NavBar.jsx
-│   │   ├── pages/          # Auth.jsx, Home.jsx
-│   │   ├── redux/          # store.js, userSlice.js
-│   │   └── utils/          # firebase.js
-│   ├── .env                # VITE_* env vars (see below)
-│   └── vite.config.js
-├── server/                 # Express + Mongoose backend
-│   ├── config/             # connectDB.js, firebaseAdmin.js, token.js
-│   ├── controllers/        # auth.controller.js, user.controller.js
-│   ├── middleware/         # isAuth.js
-│   ├── models/             # user.model.js
-│   ├── routers/            # auth.route.js, user.route.js
-│   ├── .env                # server secrets (see below)
-│   └── server.js
-├── Dockerfile              # Single-stage Node 18 image (server only)
-├── AGENTS.md
-└── README.md
-```
-
----
+React 19 + Vite frontend, Express backend. No package-manager workspace — `npm install` + `npm run dev` separately in each.
 
 ## Commands
 
 ```bash
-# Backend — port 8000 (or PORT env)
-cd server && npm install && npm run dev
+# Server (port 8000 in .env, default 5000)
+cd server && npm install && npm run dev       # nodemon
+npm test                                       # Jest (--experimental-vm-modules)
+npm run test:authcat                           # focused auth validation suite
 
-# Frontend — port 5173
+# Client (port 5173)
 cd client && npm install && npm run dev
-
-# Frontend production build
-cd client && npm run build
-
-# Frontend lint
-cd client && npm run lint
+npm run build
+npm run lint                                   # ESLint flat config, ignores dist + NavBar.jsx
 ```
 
----
+## Architecture
 
-## Environment Variables
+- **Auth:** `POST /api/auth/google` → Firebase Admin SDK verifies ID token → JWT cookie (`httpOnly`, `sameSite:strict`) + `deviceId` cookie. `isAuth` middleware validates JWT + binds session to device (Upstash Redis). `POST /api/auth/logout` clears both cookies + blacklists JWT jti.
+- **Routes:** `routers/` (not `routes/`). Rate limiters: `authLimiter` (20/15min), `sessionLimiter` (30/min) via `express-rate-limit`.
+- **Redis:** Two clients — `services/upstash.js` (Upstash REST, primary for sessions/cache/blacklist) and `config/redis.js` (ioredis, non-critical fallback). Server starts without Redis.
+- **User model:** `name`, `email` (unique, required, lowercase), `picture`, `firebaseUID` (unique, sparse), `credits` (default 100), `role` (user|admin|superadmin), `isActive`, `lastLoginAt`, timestamps.
+- **Audit logging:** `AuditLog` model via `logAuthEvent()` — events: LOGIN_SUCCESS/FAILURE, TOKEN_EXPIRED/INVALID, LOGOUT, etc.
+- **Role middleware:** `requireRole()`, `requireAdmin()`, `requireSuperAdmin()` — reads `req.userRole` set by `isAuth`.
 
-### `server/.env`
+## Key paths
 
-```env
-PORT=8000
-MONGODB_URL=<mongodb_connection_string>
-JWT_SECRET=<jwt_secret_key>
-CLIENT_URL=http://localhost:5173
+| File | Purpose |
+|------|---------|
+| `config/token.js` | `genToken()` + `verifyToken()` |
+| `config/cookie.js` | `COOKIE_OPTIONS`, `TOKEN_COOKIE_OPTIONS` |
+| `services/session.service.js` | create/get/delete session, blacklist jti, login rate limiting per email |
+| `services/cache.service.js` | Redis-backed user/permissions/roles cache |
+| `services/upstash.js` | Upstash Redis client singleton + `__setMockClient()` for tests |
+| `middleware/isAuth.js` | Reads cookie JWT + device binding + blacklist check. Exports `optionalAuth` too |
+| `middleware/rateLimiter.js` | `authLimiter` + `sessionLimiter` |
+| `middleware/roleAuth.js` | `requireRole(...roles)` |
 
-# Firebase Admin SDK (from Firebase Console → Service Account → Generate new key)
-FIREBASE_PROJECT_ID=<project_id>
-FIREBASE_CLIENT_EMAIL=<client_email>
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
+## Client quirks
 
-### `client/.env`
+- Tailwind CSS v4 via `@tailwindcss/vite` plugin — no `tailwind.config.js`.
+- `config.js` is single source of truth for `import.meta.env.VITE_*` vars. All frontend code imports from it.
+- Axios pre-configured with `withCredentials: true`. 401 interceptor redirects to `/auth` (skipped for `/auth/google`).
+- Redux: `userSlice` uses `createAsyncThunk` for `initializeAuth` (calls `GET /api/auth/me`).
+- App hides NavBar during loading; shows SplashScreen until initialized.
+- `ProtectedRoute` redirects to `/auth` with `state.from` for post-login redirect.
+- Pages `/dashboard`, `/profile`, `/interview`, `/history` are all stubs ("Coming Soon").
 
-```env
-VITE_SERVER_URL=http://localhost:8000
-VITE_FIREBASE_API_KEY=<api_key>
-VITE_FIREBASE_AUTH_DOMAIN=<project>.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=<project_id>
-VITE_FIREBASE_STORAGE_BUCKET=<project>.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=<sender_id>
-VITE_FIREBASE_APP_ID=<app_id>
-```
+## Server env vars
 
----
-
-## Auth Flow
-
-```
-Client                         Server
-  │                               │
-  ├─ signInWithPopup(Google) ─►  │
-  ├─ getIdToken() ─────────────► │
-  │                               ├─ admin.auth().verifyIdToken(idToken)
-  │                               ├─ findOrCreate User by email
-  │                               ├─ genToken(user._id) → JWT
-  │                               ├─ res.cookie("token", jwt, httpOnly)
-  ◄─ return user JSON ───────────┤
-  ├─ dispatch(setUserData(user)) │
-```
-
-- Frontend sends Firebase ID token in `POST /api/auth/google` body as `{ idToken, name, photo }`.
-- Backend verifies token with Firebase Admin SDK, extracts `email` from decoded token.
-- JWT is set as an `httpOnly` cookie (`secure: true` in production).
-- Subsequent protected requests use `isAuth` middleware that reads the cookie and attaches `req.userId`.
-
----
-
-## Key Routes
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/auth/google` | None | Google OAuth — verifies Firebase ID token, creates/finds user, sets JWT cookie |
-| `GET` | `/api/auth/logout` | None | Clears JWT cookie |
-| `GET` | `/api/user/current-user` | `isAuth` | Returns current user from MongoDB |
-
----
-
-## Data Model — `User`
-
-```js
-{
-  name:      { type: String, required: true },
-  email:     { type: String, required: true, unique: true },
-  credits:   { type: Number, default: 100 },
-  createdAt: Date,  // timestamps: true
-  updatedAt: Date,
-}
-```
-
----
-
-## Security Notes
-
-- `isAuth` middleware validates JWT from cookie; sets `req.userId`.
-- `googleAuth` controller **only** trusts `email` extracted from the server-side-verified Firebase ID token — never from `req.body` directly.
-- Cookie flags: `httpOnly: true`, `secure: process.env.NODE_ENV === "production"`, `sameSite: "strict"`.
-- Internal errors are never leaked to the client — generic 500 messages only.
-- See `.jules/sentinel.md` for documented vulnerability history and mitigations.
-
----
-
-## Known Issues / TODOs
-
-- `server/routers/auth.route.js` exposes `GET /logout` — should be `POST` to prevent CSRF via link navigation.
-- `user.model.js` does not store `firebaseUID` or `picture`/`photo` — schema needs extension for multi-provider support.
-- `client/src/App.jsx` duplicates `serverUrl` logic already defined in `client/src/config.js` — consolidate.
-- No tests defined (`npm test` exits with error on both client and server).
-- Redux `userSlice` has redundant `user` field alongside `userData`.
-
----
+`SERVER/.env` needs: `PORT`, `MONGODB_URL`, `JWT_SECRET`, `CLIENT_URL`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (with literal `\n` for newlines). Also `REDIS_URL` (ioredis, optional) and `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (Upstash, optional).
 
 ## Docker
 
-```bash
-# Build server image
-docker build -t ai-mock-interview-server .
+- Dockerfile: multi-stage Node 20-alpine, non-root user, `HEALTHCHECK` hitting `GET /api/user/current-user` (expects 401). `EXPOSE 8000`.
+- Server source at `/app/server/`, built with `npm ci --omit=dev`.
 
-# Run (pass env vars at runtime)
-docker run -p 8000:8000 \
-  -e PORT=8000 \
-  -e MONGODB_URL=<url> \
-  -e JWT_SECRET=<secret> \
-  -e CLIENT_URL=<client_url> \
-  -e FIREBASE_PROJECT_ID=<id> \
-  -e FIREBASE_CLIENT_EMAIL=<email> \
-  -e FIREBASE_PRIVATE_KEY="<key>" \
-  ai-mock-interview-server
-```
+## Known issues
 
-The Dockerfile targets the `server/` directory only. Frontend is built separately and served via a CDN/static host (Vercel, Netlify, etc.).
+- No edge-gateway directory exists yet — `ARCHITECTURE.md` describes an aspirational Cloudflare Worker layer.
+- `SECURITY.md` and `README.md` are boilerplate, not accurate to current repo state.
+- Server code has `routers/` (typo) directory — not `routes/` as README says.
