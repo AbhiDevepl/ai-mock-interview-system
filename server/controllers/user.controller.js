@@ -17,6 +17,7 @@ export const getCurrentUser = async (req, res) => {
       createdAt: user.createdAt,
     });
   } catch (error) {
+    console.error("Error fetching current user:", error.message);
     return res.status(500).json({ message: "Failed to get current user." });
   }
 };

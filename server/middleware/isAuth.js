@@ -45,7 +45,7 @@ const isAuth = async (req, res, next) => {
       });
       return res.status(401).json({ message: "Invalid authentication token." });
     }
-    return res.status(500).json({ message: "Authentication error." });
+    return res.status(401).json({ message: "Authentication error." });
   }
 };
 
