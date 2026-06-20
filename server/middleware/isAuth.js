@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { logAuthEvent } from "../config/logger.js";
 import { isJtiBlacklisted, getSession } from "../services/session.service.js";
+import { COOKIE_OPTIONS } from "../config/cookie.js";
 
 const isAuth = async (req, res, next) => {
   try {
@@ -14,9 +15,32 @@ const isAuth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const { userId, role, jti } = decoded;
+    const deviceId = req.cookies?.deviceId;
+
+    if (!deviceId) {
+      logAuthEvent("TOKEN_INVALID", req, {
+        userId,
+        metadata: { reason: "Missing device binding", jti },
+      });
+      return res.status(401).json({ message: "Invalid session." });
+    }
+
+    // Security: bind the JWT to the session record stored against this
+    // device. A token presented without a matching, current session (e.g.
+    // stolen and replayed from another device) is rejected even though
+    // the JWT signature itself is valid.
+    const session = await getSession(userId, deviceId);
+    if (!session || session.jti !== jti) {
+      logAuthEvent("TOKEN_INVALID", req, {
+        userId,
+        metadata: { reason: "Session invalid or device mismatch", jti, deviceId },
+      });
+      return res.status(401).json({ message: "Session invalid or expired." });
+    }
 
     const blacklisted = await isJtiBlacklisted(jti);
     if (blacklisted) {
+      res.clearCookie("token", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session revoked (blacklisted)", jti },
@@ -31,6 +55,7 @@ const isAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
+    res.clearCookie("token", COOKIE_OPTIONS);
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },
@@ -45,7 +70,7 @@ const isAuth = async (req, res, next) => {
       });
       return res.status(401).json({ message: "Invalid authentication token." });
     }
-    return res.status(500).json({ message: "Authentication error." });
+    return res.status(401).json({ message: "Authentication error." });
   }
 };
 
