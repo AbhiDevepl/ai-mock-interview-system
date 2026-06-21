@@ -18,6 +18,8 @@ const isAuth = async (req, res, next) => {
     const deviceId = req.cookies?.deviceId;
 
     if (!deviceId) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Missing device binding", jti },
@@ -31,6 +33,8 @@ const isAuth = async (req, res, next) => {
     // the JWT signature itself is valid.
     const session = await getSession(userId, deviceId);
     if (!session || session.jti !== jti) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session invalid or device mismatch", jti, deviceId },
@@ -41,6 +45,7 @@ const isAuth = async (req, res, next) => {
     const blacklisted = await isJtiBlacklisted(jti);
     if (blacklisted) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session revoked (blacklisted)", jti },
@@ -56,6 +61,7 @@ const isAuth = async (req, res, next) => {
     next();
   } catch (error) {
     res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },

@@ -52,7 +52,13 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const {
+      email,
+      email_verified,
+      uid: firebaseUID,
+      name: verifiedName,
+      picture: verifiedPicture,
+    } = decodedToken;
 
     // Security: require a verified email from the ID token to prevent
     // authentication bypass via unverified third-party accounts.
@@ -78,15 +84,15 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: verifiedName || name || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: verifiedPicture || photo || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      if (verifiedPicture || photo) user.picture = verifiedPicture || photo;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
       if (!user.isActive) {
