@@ -43,6 +43,7 @@ const mockRedisClient = {
 import * as upstashModule from "../services/upstash.js";
 import * as sessionService from "../services/session.service.js";
 import * as cacheService from "../services/cache.service.js";
+import * as isAuthModule from "../middleware/isAuth.js";
 
 /* ====================================================================
  * Helpers
@@ -391,6 +392,28 @@ describe("PHASE 8: Security Review", () => {
     expect(await sessionService.getSession("u","laptop")).not.toBeNull();
     expect(await sessionService.isJtiBlacklisted(ja)).toBe(true);
     expect(await sessionService.isJtiBlacklisted(jb)).toBe(false);
+  });
+
+  test("8.8 optionalAuth enforces device binding", async () => {
+    const userId = "u-bound";
+    const deviceId = "d-valid";
+    const jti = uuidv4();
+    const token = jwt.sign({ userId, jti }, process.env.JWT_SECRET);
+
+    await sessionService.createSession(userId, deviceId, { jti });
+
+    const reqValid = { cookies: { token, deviceId } };
+    const res = {};
+    let nextCalled = false;
+    await isAuthModule.optionalAuth(reqValid, res, () => { nextCalled = true; });
+    expect(nextCalled).toBe(true);
+    expect(reqValid.userId).toBe(userId);
+
+    const reqInvalid = { cookies: { token, deviceId: "d-wrong" } };
+    let nextCalled2 = false;
+    await isAuthModule.optionalAuth(reqInvalid, res, () => { nextCalled2 = true; });
+    expect(nextCalled2).toBe(true);
+    expect(reqInvalid.userId).toBeUndefined();
   });
 });
 
