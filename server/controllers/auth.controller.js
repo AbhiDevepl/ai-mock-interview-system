@@ -35,7 +35,7 @@ function sanitizeUser(user) {
 
 export const googleAuth = async (req, res) => {
   try {
-    const { idToken, name, photo } = req.body;
+    const { idToken, name: bodyName, photo: bodyPhoto } = req.body;
 
     if (!idToken) {
       return res.status(401).json({ message: "Authentication failed." });
@@ -52,7 +52,7 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const { email, email_verified, uid: firebaseUID, name: tokenName, picture: tokenPicture } = decodedToken;
 
     // Security: require a verified email from the ID token to prevent
     // authentication bypass via unverified third-party accounts.
@@ -76,17 +76,23 @@ export const googleAuth = async (req, res) => {
     let isNewUser = false;
     let user = await User.findOne({ email });
 
+    // Security: Prioritize cryptographically verified profile information from
+    // the ID token over unverified metadata sent in the request body.
+    const displayName = tokenName || bodyName || email.split("@")[0];
+    const displayPicture = tokenPicture || bodyPhoto || "";
+
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: displayName,
         email,
-        picture: photo || "",
+        picture: displayPicture,
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      user.name = displayName;
+      user.picture = displayPicture;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
       if (!user.isActive) {
@@ -174,6 +180,7 @@ export const getMe = async (req, res) => {
 
     if (!user || !user.isActive) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("UNAUTHORIZED_ACCESS", req, {
         metadata: { reason: user ? "Account deactivated" : "User not found" },
       });
