@@ -18,6 +18,8 @@ const isAuth = async (req, res, next) => {
     const deviceId = req.cookies?.deviceId;
 
     if (!deviceId) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Missing device binding", jti },
@@ -31,6 +33,8 @@ const isAuth = async (req, res, next) => {
     // the JWT signature itself is valid.
     const session = await getSession(userId, deviceId);
     if (!session || session.jti !== jti) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session invalid or device mismatch", jti, deviceId },
@@ -41,6 +45,7 @@ const isAuth = async (req, res, next) => {
     const blacklisted = await isJtiBlacklisted(jti);
     if (blacklisted) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session revoked (blacklisted)", jti },
@@ -56,8 +61,13 @@ const isAuth = async (req, res, next) => {
     next();
   } catch (error) {
     res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
+
+    const userId = jwt.decode(req.cookies?.token)?.userId;
+
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
+        userId,
         metadata: { error: error.message },
       });
       return res
@@ -66,6 +76,7 @@ const isAuth = async (req, res, next) => {
     }
     if (error.name === "JsonWebTokenError") {
       logAuthEvent("TOKEN_INVALID", req, {
+        userId,
         metadata: { error: error.message },
       });
       return res.status(401).json({ message: "Invalid authentication token." });
@@ -77,17 +88,34 @@ const isAuth = async (req, res, next) => {
 export const optionalAuth = async (req, res, next) => {
   try {
     const token = req.cookies?.token;
-    if (token) {
+    const deviceId = req.cookies?.deviceId;
+
+    if (token && deviceId) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const blacklisted = await isJtiBlacklisted(decoded.jti);
-      if (!blacklisted) {
-        req.userId = decoded.userId;
-        req.userRole = decoded.role || "user";
+      const { userId, role, jti } = decoded;
+
+      const [blacklisted, session] = await Promise.all([
+        isJtiBlacklisted(jti),
+        getSession(userId, deviceId),
+      ]);
+
+      if (!blacklisted && session && session.jti === jti) {
+        req.userId = userId;
+        req.userRole = role || "user";
         req.token = token;
-        req.jti = decoded.jti;
+        req.jti = jti;
+      } else if (blacklisted || (session && session.jti !== jti)) {
+        res.clearCookie("token", COOKIE_OPTIONS);
+        res.clearCookie("deviceId", COOKIE_OPTIONS);
       }
+    } else if (token || deviceId) {
+      // Inconsistent cookies, clear both
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
     }
   } catch {
+    res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
   }
   next();
 };

@@ -1,0 +1,4 @@
+## 2026-05-20 - [Identity metadata spoofing and Insecure session clearing]
+**Vulnerability:** Identity metadata (name and picture) was taken from client-provided body in `googleAuth`, allowing users to spoof their profile information during login. Additionally, authentication failure paths only cleared the `token` cookie, leaving the `deviceId` cookie which could be used to probe for valid session identifiers.
+**Learning:** Even when using verified ID tokens (Firebase), taking additional data from the request body without cross-referencing the token claims introduces spoofing risks. Incomplete cookie clearing on failure paths leaves stale state that can be abused for session hijacking or reconnaissance.
+**Prevention:** Always prioritize cryptographically verified claims from ID tokens over client-provided metadata. Ensure all authentication-related cookies are cleared on any validation failure path to enforce a clean security state.
