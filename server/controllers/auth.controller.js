@@ -174,6 +174,7 @@ export const getMe = async (req, res) => {
 
     if (!user || !user.isActive) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("UNAUTHORIZED_ACCESS", req, {
         metadata: { reason: user ? "Account deactivated" : "User not found" },
       });
