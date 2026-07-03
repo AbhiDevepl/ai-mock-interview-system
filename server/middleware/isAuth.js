@@ -18,6 +18,8 @@ const isAuth = async (req, res, next) => {
     const deviceId = req.cookies?.deviceId;
 
     if (!deviceId) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Missing device binding", jti },
@@ -31,6 +33,8 @@ const isAuth = async (req, res, next) => {
     // the JWT signature itself is valid.
     const session = await getSession(userId, deviceId);
     if (!session || session.jti !== jti) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session invalid or device mismatch", jti, deviceId },
@@ -41,6 +45,7 @@ const isAuth = async (req, res, next) => {
     const blacklisted = await isJtiBlacklisted(jti);
     if (blacklisted) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       logAuthEvent("TOKEN_INVALID", req, {
         userId,
         metadata: { reason: "Session revoked (blacklisted)", jti },
@@ -56,6 +61,7 @@ const isAuth = async (req, res, next) => {
     next();
   } catch (error) {
     res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },
@@ -79,15 +85,29 @@ export const optionalAuth = async (req, res, next) => {
     const token = req.cookies?.token;
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const blacklisted = await isJtiBlacklisted(decoded.jti);
-      if (!blacklisted) {
-        req.userId = decoded.userId;
-        req.userRole = decoded.role || "user";
-        req.token = token;
-        req.jti = decoded.jti;
+      const { userId, role, jti } = decoded;
+      const deviceId = req.cookies?.deviceId;
+
+      // Security: even for optional auth, if a token is present, it must be
+      // bound to the current device's session.
+      const session = await getSession(userId, deviceId);
+      if (!session || session.jti !== jti) {
+        throw new Error("Invalid session binding");
       }
+
+      const blacklisted = await isJtiBlacklisted(jti);
+      if (blacklisted) {
+        throw new Error("Session revoked");
+      }
+
+      req.userId = userId;
+      req.userRole = role || "user";
+      req.token = token;
+      req.jti = jti;
     }
   } catch {
+    res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("deviceId", COOKIE_OPTIONS);
   }
   next();
 };

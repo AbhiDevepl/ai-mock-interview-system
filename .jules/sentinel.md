@@ -1,0 +1,4 @@
+## 2026-07-03 - Insecure Session Clearing and Missing Device Binding
+**Vulnerability:** Inconsistent clearing of authentication cookies (`token` and `deviceId`) and missing device-to-session binding in the `optionalAuth` middleware.
+**Learning:** Partial cookie clearing (clearing only `token` but not `deviceId`) and skipping device-to-session binding in `optionalAuth` can leave the application vulnerable to session replay. If a stolen JWT is used on a device without a valid session record, the `optionalAuth` middleware would previously allow it if the signature was valid, and failures in `isAuth` would only clear one of the two cookies.
+**Prevention:** Consistently clear ALL authentication-related cookies on any auth failure (401/403). Enforce device-to-session binding even in optional authentication contexts whenever a token is present to ensure the token belongs to the device presenting it.
