@@ -1,6 +1,3 @@
-import request from "supertest";
-import express from "express";
-import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { jest } from "@jest/globals";
@@ -51,26 +48,23 @@ const { getSession, isJtiBlacklisted } = await import("../services/session.servi
 
 process.env.JWT_SECRET = "test-secret";
 
-describe("Hardening Security Tests", () => {
-  let app;
-
-  // CodeQL requires rate limiting on routes that perform auth or DB access.
-  // We use a dummy rate limiter for these test routes.
-  const dummyRateLimiter = (req, res, next) => next();
+describe("Hardening Security Tests (Direct Invocation)", () => {
+  let req, res, next;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    app = express();
-    app.use(express.json());
-    app.use(cookieParser());
-
-    // Test routes
-    app.get("/test-auth", dummyRateLimiter, isAuth, (req, res) => res.status(200).json({ userId: req.userId }));
-    app.get("/test-optional", dummyRateLimiter, optionalAuth, (req, res) => res.status(200).json({ userId: req.userId || null }));
-
-    // Controller routes - mimicking middleware setting req.userId
-    app.get("/api/user/current-user", dummyRateLimiter, (req, res, next) => { req.userId = "user123"; next(); }, getCurrentUser);
-    app.get("/api/auth/me", dummyRateLimiter, (req, res, next) => { req.userId = "user123"; next(); }, getMe);
+    req = {
+      cookies: {},
+      headers: {},
+      get: jest.fn(),
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      clearCookie: jest.fn().mockReturnThis(),
+      cookie: jest.fn().mockReturnThis(),
+    };
+    next = jest.fn();
   });
 
   const genTestToken = (userId, jti = uuidv4()) => {
@@ -79,114 +73,102 @@ describe("Hardening Security Tests", () => {
 
   describe("isAuth Middleware Hardening", () => {
     test("should clear BOTH cookies when deviceId is missing", async () => {
-      const token = genTestToken("user123");
-      const response = await request(app)
-        .get("/test-auth")
-        .set("Cookie", [`token=${token}`]);
+      req.cookies.token = genTestToken("user123");
 
-      expect(response.status).toBe(401);
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      await isAuth(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
 
     test("should clear BOTH cookies when session is missing/mismatched", async () => {
       const jti = uuidv4();
-      const token = genTestToken("user123", jti);
-      getSession.mockResolvedValue(null); // No session found
+      req.cookies.token = genTestToken("user123", jti);
+      req.cookies.deviceId = "device123";
+      getSession.mockResolvedValue(null);
 
-      const response = await request(app)
-        .get("/test-auth")
-        .set("Cookie", [`token=${token}`, "deviceId=device123"]);
+      await isAuth(req, res, next);
 
-      expect(response.status).toBe(401);
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
 
     test("should clear BOTH cookies when token is blacklisted", async () => {
       const jti = uuidv4();
-      const token = genTestToken("user123", jti);
+      req.cookies.token = genTestToken("user123", jti);
+      req.cookies.deviceId = "device123";
       getSession.mockResolvedValue({ jti });
       isJtiBlacklisted.mockResolvedValue(true);
 
-      const response = await request(app)
-        .get("/test-auth")
-        .set("Cookie", [`token=${token}`, "deviceId=device123"]);
+      await isAuth(req, res, next);
 
-      expect(response.status).toBe(401);
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
 
     test("should clear BOTH cookies on invalid token signature", async () => {
-      const response = await request(app)
-        .get("/test-auth")
-        .set("Cookie", ["token=invalid-token", "deviceId=device123"]);
+      req.cookies.token = "invalid-token";
+      req.cookies.deviceId = "device123";
 
-      expect(response.status).toBe(401);
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      await isAuth(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
   });
 
   describe("optionalAuth Middleware Hardening", () => {
     test("should clear BOTH cookies in optionalAuth if token present but deviceId missing", async () => {
-      const token = genTestToken("user123");
-      const response = await request(app)
-        .get("/test-optional")
-        .set("Cookie", [`token=${token}`]);
+      req.cookies.token = genTestToken("user123");
 
-      expect(response.status).toBe(200); // optionalAuth doesn't block
-      expect(response.body.userId).toBeNull();
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      await optionalAuth(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(req.userId).toBeUndefined();
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
 
     test("should clear BOTH cookies in optionalAuth if session mismatch", async () => {
       const jti = uuidv4();
-      const token = genTestToken("user123", jti);
+      req.cookies.token = genTestToken("user123", jti);
+      req.cookies.deviceId = "device123";
       getSession.mockResolvedValue(null);
 
-      const response = await request(app)
-        .get("/test-optional")
-        .set("Cookie", [`token=${token}`, "deviceId=device123"]);
+      await optionalAuth(req, res, next);
 
-      expect(response.status).toBe(200);
-      expect(response.body.userId).toBeNull();
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      expect(next).toHaveBeenCalled();
+      expect(req.userId).toBeUndefined();
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
   });
 
   describe("Controller Hardening", () => {
     test("getCurrentUser should clear BOTH cookies if user is inactive", async () => {
+      req.userId = "user123";
       mockUserFindById.mockResolvedValue({ _id: "user123", isActive: false });
 
-      const response = await request(app)
-        .get("/api/user/current-user");
+      await getCurrentUser(req, res);
 
-      expect(response.status).toBe(401);
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
 
     test("getMe should clear BOTH cookies if user is missing", async () => {
+      req.userId = "user123";
       mockUserFindById.mockResolvedValue(null);
 
-      const response = await request(app)
-        .get("/api/auth/me");
+      await getMe(req, res);
 
-      expect(response.status).toBe(401);
-      const cookies = response.headers["set-cookie"];
-      expect(cookies).toContainEqual(expect.stringMatching(/token=;/));
-      expect(cookies).toContainEqual(expect.stringMatching(/deviceId=;/));
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.clearCookie).toHaveBeenCalledWith("token", expect.any(Object));
+      expect(res.clearCookie).toHaveBeenCalledWith("deviceId", expect.any(Object));
     });
   });
 });
