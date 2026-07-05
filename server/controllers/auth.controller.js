@@ -138,7 +138,6 @@ export const logOut = async (req, res) => {
   try {
     res.clearCookie("token", COOKIE_OPTIONS);
     res.clearCookie("refreshToken", COOKIE_OPTIONS);
-    res.clearCookie("deviceId", COOKIE_OPTIONS);
 
     if (req.userId) {
       logAuthEvent("LOGOUT", req, { userId: req.userId });
