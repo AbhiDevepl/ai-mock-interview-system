@@ -1,0 +1,4 @@
+## 2026-02-12 - Insecure Session Clearing & Optional Auth Bypass
+**Vulnerability:** Authentication failure paths only cleared the `token` cookie, leaving the `deviceId` cookie on the client. Additionally, `optionalAuth` did not verify device-to-session binding, allowing stolen JWTs to be used in "optional" contexts.
+**Learning:** Partial session clearing can lead to inconsistent client states or session replay risks if the device identifier remains. Optional authentication middleware must be as rigorous as mandatory middleware if it chooses to process a provided token.
+**Prevention:** Always clear all session-related cookies (JWT, device identifiers, etc.) in a single "fail-secure" block. Enforce session-to-device binding in every middleware that decodes a JWT, even if the route is optionally authenticated.
