@@ -1,7 +1,10 @@
 import admin from "firebase-admin";
 import dotenv from "dotenv";
 
-dotenv.config();
+// ponytail: load environment variables, but avoid overriding test-specific settings
+if (process.env.NODE_ENV !== "test") {
+  dotenv.config();
+}
 
 const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
@@ -11,8 +14,10 @@ const serviceAccount = {
   privateKey: privateKey,
 };
 
-if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-  console.warn("Firebase Admin SDK environment variables are missing. Some authentication features may not work correctly.");
+const isTesting = process.env.NODE_ENV === "test";
+
+if (isTesting || !serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+  console.warn("Firebase Admin SDK running in test/mock mode or environment variables are missing.");
 } else {
   if (!admin.apps.length) {
     admin.initializeApp({

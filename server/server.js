@@ -1,7 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/connectDB.js";
-import { connectRedis } from "./config/redis.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
@@ -36,16 +35,6 @@ const PORT = process.env.PORT || 5000;
 const start = async () => {
   try {
     await connectDB();
-
-    // Fire Redis connection in parallel — non-critical for startup
-    // Server starts immediately; Redis handles its own reconnection
-    // getRedisClient() gracefully returns null if unavailable
-    connectRedis().catch((err) => {
-      console.warn(
-        "Redis unavailable — server will proceed without Redis:",
-        err.message,
-      );
-    });
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

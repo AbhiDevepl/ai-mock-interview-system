@@ -1,18 +1,9 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import { admin } from "../config/firebaseAdmin.js";
-import { genToken } from "../config/token.js";
-import { TOKEN_COOKIE_OPTIONS, COOKIE_OPTIONS } from "../config/cookie.js";
+import { genAccessToken, genRefreshToken } from "../config/token.js";
+import { COOKIE_OPTIONS } from "../config/cookie.js";
 import { logAuthEvent } from "../config/logger.js";
-import {
-  createSession,
-  deleteSession,
-  generateDeviceId,
-  blacklistJti,
-  recordLoginAttempt,
-  isLoginBlocked,
-} from "../services/session.service.js";
-import { setCachedUser, invalidateAllUserCaches } from "../services/cache.service.js";
 
 const USER_DATA_FIELDS = [
   "_id",
@@ -33,6 +24,30 @@ function sanitizeUser(user) {
   return data;
 }
 
+// ponytail: in-memory login rate limiting per instance
+const loginAttempts = new Map();
+const ATTEMPTS_LIMIT = 5;
+const BAN_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+const recordLoginAttempt = async (email) => {
+  const now = Date.now();
+  if (!loginAttempts.has(email)) {
+    loginAttempts.set(email, []);
+  }
+  const history = loginAttempts.get(email);
+  history.push(now);
+  // Clean up old attempts
+  const activeAttempts = history.filter((t) => now - t < BAN_WINDOW_MS);
+  loginAttempts.set(email, activeAttempts);
+};
+
+const isLoginBlocked = async (email) => {
+  const history = loginAttempts.get(email) || [];
+  const now = Date.now();
+  const activeAttempts = history.filter((t) => now - t < BAN_WINDOW_MS);
+  return activeAttempts.length >= ATTEMPTS_LIMIT;
+};
+
 export const googleAuth = async (req, res) => {
   try {
     const { idToken, name, photo } = req.body;
@@ -41,7 +56,6 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const ip = req.ip || req.connection?.remoteAddress || "0.0.0.0";
     let decodedToken;
     try {
       decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -54,8 +68,6 @@ export const googleAuth = async (req, res) => {
 
     const { email, email_verified, uid: firebaseUID } = decodedToken;
 
-    // Security: require a verified email from the ID token to prevent
-    // authentication bypass via unverified third-party accounts.
     if (!email || !email_verified) {
       logAuthEvent("LOGIN_FAILURE", req, {
         metadata: { error: !email ? "No email in token" : "Email not verified", email },
@@ -95,26 +107,17 @@ export const googleAuth = async (req, res) => {
       await user.save();
     }
 
-    const token = genToken(user._id, user.role);
-    const decoded = jwt.decode(token);
-    const jti = decoded.jti;
-    const deviceId = generateDeviceId(req);
+    // ponytail: generate stateless access and refresh tokens
+    const accessToken = genAccessToken(user._id, user.role);
+    const refreshToken = genRefreshToken(user._id, user.role);
 
-    await createSession(user._id, deviceId, {
-      role: user.role,
-      ip,
-      device: req.get("User-Agent")?.includes("Mobile") ? "mobile" : "desktop",
-      deviceName: req.get("User-Agent") || "unknown",
-      jti,
-      nonce: 0,
-    });
-
-    await setCachedUser(user._id, sanitizeUser(user));
-
-    res.cookie("token", token, TOKEN_COOKIE_OPTIONS);
-    res.cookie("deviceId", deviceId, {
+    res.cookie("token", accessToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 15 * 60 * 1000, // 15 mins
+    });
+    res.cookie("refreshToken", refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     logAuthEvent(isNewUser ? "USER_CREATED" : "LOGIN_SUCCESS", req, {
@@ -133,27 +136,8 @@ export const googleAuth = async (req, res) => {
 
 export const logOut = async (req, res) => {
   try {
-    if (req.userId && req.token) {
-      try {
-        const decoded = jwt.decode(req.token);
-        if (decoded && decoded.exp) {
-          const remainingTtl = decoded.exp - Math.floor(Date.now() / 1000);
-          if (remainingTtl > 0) {
-            await blacklistJti(decoded.jti, remainingTtl);
-          }
-        }
-      } catch {
-      }
-
-      const deviceId = req.cookies?.deviceId;
-      if (deviceId) {
-        await deleteSession(req.userId, deviceId);
-      }
-
-      await invalidateAllUserCaches(req.userId);
-    }
-
     res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
     res.clearCookie("deviceId", COOKIE_OPTIONS);
 
     if (req.userId) {
@@ -169,11 +153,11 @@ export const logOut = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     const { userId } = req;
-
     const user = await User.findById(userId);
 
     if (!user || !user.isActive) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
       logAuthEvent("UNAUTHORIZED_ACCESS", req, {
         metadata: { reason: user ? "Account deactivated" : "User not found" },
       });
@@ -181,8 +165,6 @@ export const getMe = async (req, res) => {
     }
 
     const sanitized = sanitizeUser(user);
-    await setCachedUser(userId, sanitized);
-
     logAuthEvent("SESSION_REFRESH", req, {
       userId: user._id,
       email: user.email,
@@ -191,5 +173,46 @@ export const getMe = async (req, res) => {
     return res.status(200).json(sanitized);
   } catch (error) {
     return res.status(500).json({ message: "Failed to get current user." });
+  }
+};
+
+// ponytail: stateless refresh token rotation (RTR) endpoint
+export const refreshAuth = async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({ message: "Refresh token missing." });
+    }
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    if (decoded.type !== "refresh") {
+      return res.status(401).json({ message: "Invalid token type." });
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user || !user.isActive) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
+      return res.status(401).json({ message: "User not found or inactive." });
+    }
+
+    // ponytail: issue rotated access and refresh tokens
+    const newAccessToken = genAccessToken(user._id, user.role);
+    const newRefreshToken = genRefreshToken(user._id, user.role);
+
+    res.cookie("token", newAccessToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 15 * 60 * 1000,
+    });
+    res.cookie("refreshToken", newRefreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
+    return res.status(401).json({ message: "Invalid or expired refresh token." });
   }
 };
