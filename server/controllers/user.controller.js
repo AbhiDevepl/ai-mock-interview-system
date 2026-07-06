@@ -1,9 +1,12 @@
 import User from "../models/user.model.js";
+import { COOKIE_OPTIONS } from "../config/cookie.js";
 
 export const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user || !user.isActive) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
       return res.status(401).json({ message: "Authentication required." });
     }
     return res.status(200).json({

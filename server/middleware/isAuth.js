@@ -17,6 +17,7 @@ const isAuth = async (req, res, next) => {
     
     // ponytail: verify token type is access
     if (decoded.type !== "access") {
+      res.clearCookie("token", COOKIE_OPTIONS);
       return res.status(401).json({ message: "Invalid token type." });
     }
 
@@ -27,6 +28,7 @@ const isAuth = async (req, res, next) => {
     next();
   } catch (error) {
     res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },

@@ -66,7 +66,13 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const {
+      email,
+      email_verified,
+      uid: firebaseUID,
+      name: firebaseName,
+      picture: firebasePicture,
+    } = decodedToken;
 
     if (!email || !email_verified) {
       logAuthEvent("LOGIN_FAILURE", req, {
@@ -90,20 +96,26 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: firebaseName || name || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: firebasePicture || photo || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      if (!user.isActive) {
+        logAuthEvent("LOGIN_FAILURE", req, {
+          metadata: { error: "Account deactivated", email },
+        });
+        return res.status(401).json({
+          message: "Account deactivated. Please contact support.",
+        });
+      }
+
+      if (firebasePicture || photo) user.picture = firebasePicture || photo;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
-      if (!user.isActive) {
-        user.isActive = true;
-      }
       await user.save();
     }
 
