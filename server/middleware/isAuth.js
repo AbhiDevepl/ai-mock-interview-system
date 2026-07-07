@@ -27,6 +27,7 @@ const isAuth = async (req, res, next) => {
     next();
   } catch (error) {
     res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
     if (error.name === "TokenExpiredError") {
       logAuthEvent("TOKEN_EXPIRED", req, {
         metadata: { error: error.message },
@@ -54,8 +55,10 @@ export const optionalAuth = async (req, res, next) => {
         req.token = token;
       }
     }
-  } catch {
-    // Ignore invalid/expired tokens for optional auth
+  } catch (error) {
+    // Clear invalid cookies even in optional auth to prevent useless repeated sends
+    res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
   }
   next();
 };

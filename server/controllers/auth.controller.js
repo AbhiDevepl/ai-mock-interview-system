@@ -50,7 +50,7 @@ const isLoginBlocked = async (email) => {
 
 export const googleAuth = async (req, res) => {
   try {
-    const { idToken, name, photo } = req.body;
+    const { idToken } = req.body;
 
     if (!idToken) {
       return res.status(401).json({ message: "Authentication failed." });
@@ -60,15 +60,25 @@ export const googleAuth = async (req, res) => {
     try {
       decodedToken = await admin.auth().verifyIdToken(idToken);
     } catch (firebaseError) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
       logAuthEvent("LOGIN_FAILURE", req, {
         metadata: { error: "Firebase token verification failed" },
       });
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const {
+      email,
+      email_verified,
+      uid: firebaseUID,
+      name: firebaseName,
+      picture: firebasePicture,
+    } = decodedToken;
 
     if (!email || !email_verified) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
       logAuthEvent("LOGIN_FAILURE", req, {
         metadata: { error: !email ? "No email in token" : "Email not verified", email },
       });
@@ -77,6 +87,8 @@ export const googleAuth = async (req, res) => {
 
     const blocked = await isLoginBlocked(email);
     if (blocked) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
       logAuthEvent("LOGIN_FAILURE", req, {
         metadata: { error: "Login blocked due to too many attempts", email },
       });
@@ -90,20 +102,29 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: firebaseName || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: firebasePicture || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
-      if (firebaseUID) user.firebaseUID = firebaseUID;
-      user.lastLoginAt = new Date();
       if (!user.isActive) {
-        user.isActive = true;
+        res.clearCookie("token", COOKIE_OPTIONS);
+        res.clearCookie("refreshToken", COOKIE_OPTIONS);
+        logAuthEvent("LOGIN_FAILURE", req, {
+          metadata: { error: "Account is deactivated", email },
+        });
+        return res.status(403).json({ message: "Your account is deactivated." });
       }
+
+      // Prioritize verified Firebase identity claims over client-provided data
+      if (firebasePicture) user.picture = firebasePicture;
+      if (firebaseName) user.name = firebaseName;
+
+      user.firebaseUID = firebaseUID;
+      user.lastLoginAt = new Date();
       await user.save();
     }
 
@@ -127,8 +148,10 @@ export const googleAuth = async (req, res) => {
 
     return res.status(200).json(sanitizeUser(user));
   } catch (error) {
+    res.clearCookie("token", COOKIE_OPTIONS);
+    res.clearCookie("refreshToken", COOKIE_OPTIONS);
     logAuthEvent("LOGIN_FAILURE", req, {
-      metadata: { error: "Internal server error" },
+      metadata: { error: error.message || "Internal server error" },
     });
     return res.status(500).json({ message: "Authentication failed." });
   }

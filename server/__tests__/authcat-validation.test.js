@@ -105,7 +105,7 @@ describe("PHASE 4: Optional Auth Middleware", () => {
   test("4.1 optionalAuth passes and binds user", async () => {
     const token = genAccessToken("user_123", "admin");
     const req = { cookies: { token } };
-    const res = {};
+    const res = { clearCookie: jest.fn() };
     const next = jest.fn();
 
     await optionalAuth(req, res, next);
@@ -117,7 +117,7 @@ describe("PHASE 4: Optional Auth Middleware", () => {
   test("4.2 optionalAuth ignores expired tokens and continues", async () => {
     const token = jwt.sign({ userId: "u", type: "access" }, process.env.JWT_SECRET, { expiresIn: "0s" });
     const req = { cookies: { token } };
-    const res = {};
+    const res = { clearCookie: jest.fn() };
     const next = jest.fn();
 
     await optionalAuth(req, res, next);
