@@ -1,13 +1,23 @@
-import jwt from "jsonwebtoken"
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
-const getToken = async (userId) => {
-  try {
-    const token = jwt.sign({userId}, process.env.JWT_SECRET,
-        {expiresIn: "7d"})
-    return token;
-  }catch (error) {
-    console.log(error);
-  }
+export function genToken(userId, role = "user") {
+  const jti = crypto.randomUUID();
+  const token = jwt.sign({ userId, role, jti }, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
+  return token;
 }
 
-export default {getToken}
+export function verifyToken(token) {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { valid: true, decoded };
+  } catch (error) {
+    if (error.name === "TokenExpiredError")
+      return { valid: false, reason: "expired" };
+    if (error.name === "JsonWebTokenError")
+      return { valid: false, reason: "invalid" };
+    return { valid: false, reason: "error" };
+  }
+}

@@ -4,7 +4,7 @@ A comprehensive, full-stack application designed to help job seekers practice an
 
 ## 🌟 Key Features
 
-*   **Secure Authentication:** Multi-provider authentication using Firebase (Email/Password, Google, GitHub) seamlessly integrated with a custom backend JWT session management.
+*   **Secure Authentication:** Google Sign-In using Firebase Authentication seamlessly integrated with a custom backend stateless JWT with silent refresh token rotation.
 *   **Specialized Interview Setups:** Users can configure interview parameters like difficulty, domain (e.g., frontend, backend), and interview style.
 *   **Real-time Interview Room:** A focused environment for conducting mock interviews.
 *   **Comprehensive Results & Feedback:** Detailed performance reports after each interview session highlighting strengths and areas for improvement.
@@ -62,10 +62,15 @@ npm install
 Create a `.env` file in the `server` directory and configure the following environment variables:
 
 ```env
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
+PORT=8000
+MONGODB_URL=mongodb://localhost:27017/ai-mock-interview-system
 JWT_SECRET=your_super_secret_jwt_key
 CLIENT_URL=http://localhost:5173
+
+# Firebase Admin SDK Configuration
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@example.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 Start the backend development server:
@@ -129,14 +134,14 @@ npm run preview
 
 ## 🧪 Testing
 
-No automated test suite is currently defined.
+The backend includes a comprehensive validation suite for stateless JWT, Refresh Token Rotation, and logout logic.
+
+To run the tests:
 
 ```bash
 cd server
 npm test
 ```
-
-The server test script currently exits with `Error: no test specified`.
 
 ```bash
 cd client
