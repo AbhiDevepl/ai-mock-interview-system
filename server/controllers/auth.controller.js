@@ -50,7 +50,7 @@ const isLoginBlocked = async (email) => {
 
 export const googleAuth = async (req, res) => {
   try {
-    const { idToken, name, photo } = req.body;
+    const { idToken } = req.body;
 
     if (!idToken) {
       return res.status(401).json({ message: "Authentication failed." });
@@ -66,11 +66,20 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const {
+      email,
+      email_verified,
+      uid: firebaseUID,
+      name: verifiedName,
+      picture: verifiedPicture,
+    } = decodedToken;
 
     if (!email || !email_verified) {
       logAuthEvent("LOGIN_FAILURE", req, {
-        metadata: { error: !email ? "No email in token" : "Email not verified", email },
+        metadata: {
+          error: !email ? "No email in token" : "Email not verified",
+          email,
+        },
       });
       return res.status(401).json({ message: "Authentication failed." });
     }
@@ -90,20 +99,27 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: verifiedName || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: verifiedPicture || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      if (!user.isActive) {
+        logAuthEvent("LOGIN_FAILURE", req, {
+          metadata: { error: "User account deactivated", email },
+        });
+        return res.status(403).json({
+          message: "Your account has been deactivated. Please contact support.",
+        });
+      }
+
+      if (verifiedPicture) user.picture = verifiedPicture;
+      if (verifiedName) user.name = verifiedName;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
-      if (!user.isActive) {
-        user.isActive = true;
-      }
       await user.save();
     }
 
