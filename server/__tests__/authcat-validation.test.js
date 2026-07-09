@@ -127,7 +127,7 @@ describe("PHASE 4: Optional Auth Middleware", () => {
 });
 
 describe("PHASE 5: Refresh Token Rotation", () => {
-  test("5.1 refreshAuth accepts valid refresh token and rotates cookies", async () => {
+  test("5.1 refreshAuth rotates tokens successfully", async () => {
     const refreshToken = genRefreshToken("test-user-id", "user");
     const req = { cookies: { refreshToken } };
     const res = {
@@ -139,7 +139,8 @@ describe("PHASE 5: Refresh Token Rotation", () => {
 
     await refreshAuth(req, res);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.cookie).toHaveBeenCalledTimes(2);
+    expect(res.cookie).toHaveBeenCalledWith("token", expect.any(String), expect.any(Object));
+    expect(res.cookie).toHaveBeenCalledWith("refreshToken", expect.any(String), expect.any(Object));
   });
 });
 
