@@ -12,7 +12,10 @@ import {
   recordLoginAttempt,
   isLoginBlocked,
 } from "../services/session.service.js";
-import { setCachedUser, invalidateAllUserCaches } from "../services/cache.service.js";
+import {
+  setCachedUser,
+  invalidateAllUserCaches,
+} from "../services/cache.service.js";
 
 const USER_DATA_FIELDS = [
   "_id",
@@ -58,7 +61,10 @@ export const googleAuth = async (req, res) => {
     // authentication bypass via unverified third-party accounts.
     if (!email || !email_verified) {
       logAuthEvent("LOGIN_FAILURE", req, {
-        metadata: { error: !email ? "No email in token" : "Email not verified", email },
+        metadata: {
+          error: !email ? "No email in token" : "Email not verified",
+          email,
+        },
       });
       return res.status(401).json({ message: "Authentication failed." });
     }
@@ -68,7 +74,9 @@ export const googleAuth = async (req, res) => {
       logAuthEvent("LOGIN_FAILURE", req, {
         metadata: { error: "Login blocked due to too many attempts", email },
       });
-      return res.status(429).json({ message: "Too many login attempts. Try again later." });
+      return res
+        .status(429)
+        .json({ message: "Too many login attempts. Try again later." });
     }
 
     await recordLoginAttempt(email);
@@ -142,8 +150,7 @@ export const logOut = async (req, res) => {
             await blacklistJti(decoded.jti, remainingTtl);
           }
         }
-      } catch {
-      }
+      } catch {}
 
       const deviceId = req.cookies?.deviceId;
       if (deviceId) {

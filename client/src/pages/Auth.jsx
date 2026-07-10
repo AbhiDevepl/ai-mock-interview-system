@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { BsRobot } from "react-icons/bs";
 import { IoSparkles } from "react-icons/io5";
 import { FcGoogle } from "react-icons/fc";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { signInWithPopup } from "firebase/auth";
 import { auth, provider } from "../utils/firebase";
 import { useDispatch, useSelector } from "react-redux";
@@ -17,9 +17,10 @@ import {
 import { useNavigate, useLocation } from "react-router-dom";
 import { appConfig } from "../config";
 import axios from "axios";
-import { ServerUrl } from "../App";
 
-function Auth() {
+const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
+
+function Auth({ isModal = false }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,10 +41,10 @@ function Auth() {
     try {
       dispatch(setLoading(true));
       const response = await signInWithPopup(auth, provider);
-      let User = response.user;
-      let name = User.displayName;
-      let email = User.email;
-      let photo = User.photoURL;
+      const User = response.user;
+      const name = User.displayName;
+      const email = User.email;
+      const photo = User.photoURL;
 
       const result = await axios.post(ServerUrl + "/api/auth/google",
         { name, email, photo }, { withCredentials: true });
@@ -70,12 +71,14 @@ function Auth() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-[#f3f3f3] flex items-center justify-center px-6 py-20">
+    <div
+      className={`w-full ${isModal ? "min-h-screen bg-[#f3f3f3] flex items-center justify-center px-6 py-20" : ""}`}
+    >
       <motion.div
         initial={{ opacity: 0, y: -40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.05 }}
-        className="w-full max-w-md p-8 rounded-3xl bg-white shadow-2xl border border-gray-200"
+        className={`w-full ${isModal ? "max-w-md p-8 rounded-3xl shadow-lg bg-white" : "max-w-2xl p-12 rounded-3xl shadow-lg bg-white"}`}
       >
         <div className="flex items-center justify-center gap-3 mb-6">
           <div className="bg-black text-white p-2 rounded-lg">

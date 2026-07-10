@@ -1,21 +1,20 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useSelector } from "react-redux";
+import { selectUser } from "../redux/userSlice";
 import { FaTimes } from "react-icons/fa";
-import { selectUser, selectIsAuthenticated } from "../redux/userSlice";
-import Auth from "../pages/Auth";
+import Auth from "./Auth";
 
 function AuthModel({ onClose }) {
-  const isAuthenticated = useSelector(selectIsAuthenticated);
   const userData = useSelector(selectUser);
 
   useEffect(() => {
-    if (isAuthenticated && userData) {
+    if (userData) {
       onClose();
     }
-  }, [isAuthenticated, userData, onClose]);
+  }, [userData, onClose]);
 
   return (
-    <div className="fixed inset-0 z-999 flex items-center justify-center bg-black bg-opacity-50 px-4">
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/10 backdrop-blur-sm px-4">
       <div className="relative w-full max-w-md">
         <button
           onClick={onClose}
@@ -23,7 +22,7 @@ function AuthModel({ onClose }) {
         >
           <FaTimes size={18} />
         </button>
-        <Auth />
+        <Auth isModal={true} />
       </div>
     </div>
   );

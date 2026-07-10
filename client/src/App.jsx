@@ -18,7 +18,7 @@ function App() {
     const getUser = async () => {
       try {
         const result = await axios.get(ServerUrl + "/api/user/current-user", {
-          withCredentials: true
+          withCredentials: true,
         });
         dispatch(setUserData(result.data));
       } catch (error) {
