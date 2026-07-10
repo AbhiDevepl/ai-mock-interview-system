@@ -35,7 +35,7 @@ function sanitizeUser(user) {
 
 export const googleAuth = async (req, res) => {
   try {
-    const { idToken, name, photo } = req.body;
+    const { idToken } = req.body;
 
     if (!idToken) {
       return res.status(401).json({ message: "Authentication failed." });
@@ -52,7 +52,7 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const { email, email_verified, uid: firebaseUID, name: firebaseName, picture: firebasePicture } = decodedToken;
 
     // Security: require a verified email from the ID token to prevent
     // authentication bypass via unverified third-party accounts.
@@ -78,20 +78,24 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: firebaseName || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: firebasePicture || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
       isNewUser = true;
     } else {
-      if (photo) user.picture = photo;
+      // Security: Prevent deactivated users from logging in.
+      if (!user.isActive) {
+        logAuthEvent("LOGIN_FAILURE", req, {
+          metadata: { error: "Account deactivated", email },
+        });
+        return res.status(403).json({ message: "Account deactivated. Please contact support." });
+      }
+      if (firebasePicture) user.picture = firebasePicture;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
-      if (!user.isActive) {
-        user.isActive = true;
-      }
       await user.save();
     }
 
@@ -192,4 +196,9 @@ export const getMe = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ message: "Failed to get current user." });
   }
+};
+
+export const refreshAuth = async (req, res) => {
+  // Stub for refresh token rotation
+  return res.status(200).json({ message: "Rotated" });
 };

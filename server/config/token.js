@@ -1,12 +1,24 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
-export function genToken(userId, role = "user") {
+export function genAccessToken(userId, role = "user") {
   const jti = crypto.randomUUID();
-  const token = jwt.sign({ userId, role, jti }, process.env.JWT_SECRET, {
+  const token = jwt.sign({ userId, role, jti, type: "access" }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
+  return token;
+}
+
+export function genRefreshToken(userId, role = "user") {
+  const jti = crypto.randomUUID();
+  const token = jwt.sign({ userId, role, jti, type: "refresh" }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
   return token;
+}
+
+export function genToken(userId, role = "user") {
+  return genAccessToken(userId, role);
 }
 
 export function verifyToken(token) {
