@@ -1,53 +1,35 @@
-import { useEffect, useRef } from "react";
-import { Route, Routes, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useEffect, useState } from "react";
+import { Route, Routes } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import NavBar from "./components/NavBar";
 import ProtectedRoute from "./components/ProtectedRoute";
-import SplashScreen from "./components/SplashScreen";
-import {
-  initializeAuth,
-  clearUser,
-  selectIsInitialized,
-  selectIsLoading,
-} from "./redux/userSlice";
-import { setupAxiosInterceptors } from "./utils/axios";
+import axios from "axios";
+import { setUserData } from "./redux/userSlice";
 
-export const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
+const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
 
 function App() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const initialized = useSelector(selectIsInitialized);
-  const loading = useSelector(selectIsLoading);
-  const initStarted = useRef(false);
+  const [loading, setLoading] = useState(true);
 
-  // === Auth Initialization State Machine ===
-  // Phase 0: App mounts, nothing has happened yet.
-  // Phase 1: On first mount, dispatch initializeAuth (which uses api with withCredentials: true baked in).
-  // Phase 2: If the /me call succeeds, user is authenticated; if it fails (401), user is a guest.
-  // The SplashScreen renders until initialized === true.
   useEffect(() => {
-    if (!initStarted.current) {
-      initStarted.current = true;
-      dispatch(initializeAuth());
-    }
+    const getUser = async () => {
+      try {
+        const result = await axios.get(ServerUrl + "/api/user/current-user", {
+          withCredentials: true
+        });
+        dispatch(setUserData(result.data));
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getUser();
   }, [dispatch]);
-
-  // === Axios 401 Interceptor ===
-  // When any API call returns 401 (not auth-related),
-  // clear user state and redirect to /auth.
-  useEffect(() => {
-    setupAxiosInterceptors(() => {
-      dispatch(clearUser());
-      navigate("/auth", { replace: true });
-    });
-  }, [dispatch, navigate]);
-
-  if (!initialized) {
-    return <SplashScreen />;
-  }
 
   return (
     <div className="min-h-screen bg-[#f3f3f3]">

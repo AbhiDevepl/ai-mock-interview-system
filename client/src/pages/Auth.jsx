@@ -15,46 +15,45 @@ import {
   selectIsLoading,
 } from "../redux/userSlice";
 import { useNavigate, useLocation } from "react-router-dom";
-import api from "../utils/axios";
 import { appConfig } from "../config";
+import axios from "axios";
+import { ServerUrl } from "../App";
 
 function Auth() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/dashboard";
 
-  const userData = useSelector(selectUser);
+  // Selectors
   const loading = useSelector(selectIsLoading);
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const userData = useSelector(selectUser);
 
   useEffect(() => {
-    if (!loading && isAuthenticated && userData) {
-      navigate(from, { replace: true });
+    if (isAuthenticated && userData) {
+      const from = location.state?.from || "/";
+      navigate(from);
     }
-  }, [userData, loading, isAuthenticated, navigate, from]);
+  }, [isAuthenticated, userData, navigate, location.state]);
 
   const handleGoogleAuth = async () => {
     try {
       dispatch(setLoading(true));
       const response = await signInWithPopup(auth, provider);
-      const firebaseUser = response.user;
-      const idToken = await firebaseUser.getIdToken();
-      const payload = {
-        idToken,
-        name: firebaseUser.displayName,
-        photo: firebaseUser.photoURL,
-      };
+      let User = response.user;
+      let name = User.displayName;
+      let email = User.email;
+      let photo = User.photoURL;
 
-      const result = await api.post("api/auth/google", payload);
-
+      const result = await axios.post(ServerUrl + "/api/auth/google",
+        { name, email, photo }, { withCredentials: true });
       dispatch(setUserData(result.data));
-      navigate(from, { replace: true });
     } catch (error) {
-      if (error.code !== "auth/popup-closed-by-user") {
-        console.error("Auth Error:", error);
-        dispatch(setError(error.message));
-      }
+      console.log(error);
+      dispatch(setError(error.message));
+      dispatch(setUserData(null));
+    } finally {
+      dispatch(setLoading(false));
     }
   };
 
