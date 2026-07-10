@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 import connectDB from "./config/connectDB.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import helmet from "helmet";
 import authRouter from "./routers/auth.route.js";
 import userRouter from "./routers/user.route.js";
 
