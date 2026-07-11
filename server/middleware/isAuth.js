@@ -14,6 +14,7 @@ const isAuth = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized access." });
     }
 
+    req.user = decoded;
     req.userId = decoded.userId;
     req.userRole = decoded.role;
 
@@ -30,6 +31,7 @@ export const optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (decoded && decoded.userId) {
+        req.user = decoded;
         req.userId = decoded.userId;
         req.userRole = decoded.role;
       }

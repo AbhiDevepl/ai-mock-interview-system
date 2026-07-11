@@ -6,7 +6,7 @@ import { authLimiter, sessionLimiter } from "../middleware/rateLimiter.js";
 const authRouter = express.Router();
 
 authRouter.post("/google", authLimiter, googleAuth);
-authRouter.post("/logout", optionalAuth, logOut);
+authRouter.post("/logout", sessionLimiter, optionalAuth, logOut);
 authRouter.get("/me", sessionLimiter, isAuth, getMe);
 
 export default authRouter;
