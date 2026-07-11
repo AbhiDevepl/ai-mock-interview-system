@@ -12,7 +12,7 @@ import AuthModel from "./AuthModel";
 const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
 
 function NavBar() {
-  const { userData } = useSelector(selectUser);
+  const userData = useSelector(selectUser);
   const [showCreditsPopup, setShowCreditsPopup] = useState(false);
   const [showUserPopup, setShowUserPopup] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -21,7 +21,7 @@ function NavBar() {
 
   const handleLogout = async () => {
     try {
-      await axios.get(ServerUrl + "/api/auth/logout", { withCredentials: true });
+      await axios.post(ServerUrl + "/api/auth/logout", {}, { withCredentials: true });
       dispatch(setUserData(null));
       setShowCreditsPopup(false);
       setShowUserPopup(false);
@@ -91,10 +91,16 @@ function NavBar() {
                 setShowUserPopup(!showUserPopup);
                 setShowCreditsPopup(false);
               }}
-              className="w-9 h-9 bg-black text-white rounded-full flex items-center justify-center
+              className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden
               font-semibold"
             >
-              {userData?.name ? userData.name.slice(0, 1).toUpperCase() : <FaUserAstronaut size={18} />}
+              {userData?.picture ? (
+                <img src={userData.picture} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full bg-black text-white flex items-center justify-center rounded-full">
+                  {userData?.name ? userData.name.slice(0, 1).toUpperCase() : <FaUserAstronaut size={18} />}
+                </span>
+              )}
             </button>
             {showUserPopup && (
               <div className="absolute right-0 mt-3 w-48 bg-white shadow-xl border border-gray-200

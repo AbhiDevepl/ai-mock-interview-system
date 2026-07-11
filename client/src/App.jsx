@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import { useDispatch } from "react-redux";
+import axios from "axios";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import NavBar from "./components/NavBar";
@@ -10,17 +11,14 @@ const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
 
 function App() {
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const getUser = async () => {
       try {
-        const result = await api.get(ServerUrl + "/api/user/current-user");
+        const result = await axios.get(ServerUrl + "/api/user/current-user", { withCredentials: true });
         dispatch(setUserData(result.data));
       } catch (error) {
         console.error("Error fetching user data:", error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -29,7 +27,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#f3f3f3]">
-      {!loading && <NavBar />}
+      <NavBar />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth" element={<Auth />} />

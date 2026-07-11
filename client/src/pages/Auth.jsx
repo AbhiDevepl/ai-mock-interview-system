@@ -43,11 +43,11 @@ function Auth({ isModal = false }) {
       const response = await signInWithPopup(auth, provider);
       const User = response.user;
       const name = User.displayName;
-      const email = User.email;
       const photo = User.photoURL;
 
+      const idToken = await User.getIdToken();
       const result = await axios.post(ServerUrl + "/api/auth/google",
-        { name, email, photo }, { withCredentials: true });
+        { idToken, name, photo }, { withCredentials: true });
       dispatch(setUserData(result.data));
     } catch (error) {
       console.log(error);
@@ -72,7 +72,7 @@ function Auth({ isModal = false }) {
 
   return (
     <div
-      className={`w-full ${isModal ? "min-h-screen bg-[#f3f3f3] flex items-center justify-center px-6 py-20" : ""}`}
+      className={`w-full ${!isModal ? "min-h-screen bg-[#f3f3f3] flex items-center justify-center px-6 py-20" : ""}`}
     >
       <motion.div
         initial={{ opacity: 0, y: -40 }}

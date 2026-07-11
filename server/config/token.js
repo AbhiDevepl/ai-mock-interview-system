@@ -1,12 +1,28 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 
+// Main token used by the existing auth flow (access token, 7-day expiry)
 export function genToken(userId, role = "user") {
   const jti = crypto.randomUUID();
-  const token = jwt.sign({ userId, role, jti }, process.env.JWT_SECRET, {
+  return jwt.sign({ userId, role, jti, type: "access" }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
-  return token;
+}
+
+// Short-lived access token (used by token-rotation flow)
+export function genAccessToken(userId, role = "user") {
+  const jti = crypto.randomUUID();
+  return jwt.sign({ userId, role, jti, type: "access" }, process.env.JWT_SECRET, {
+    expiresIn: "15m",
+  });
+}
+
+// Long-lived refresh token
+export function genRefreshToken(userId, role = "user") {
+  const jti = crypto.randomUUID();
+  return jwt.sign({ userId, role, jti, type: "refresh" }, process.env.JWT_SECRET, {
+    expiresIn: "30d",
+  });
 }
 
 export function verifyToken(token) {

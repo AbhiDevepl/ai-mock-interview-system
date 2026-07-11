@@ -9,7 +9,6 @@ import {
   BsFileEarmarkText,
 } from "react-icons/bs";
 import { HiSparkles } from "react-icons/hi";
-import NavBar from "../components/NavBar";
 import AuthModel from "../components/AuthModel";
 import { useNavigate } from "react-router-dom";
 import evalImg from "../assets/ai-ans.png";
@@ -107,8 +106,6 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-[#f3f3f3] flex flex-col">
-      <NavBar />
-
       <div className="flex-1 px-6 py-20">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-center mb-6">
