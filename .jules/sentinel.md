@@ -1,0 +1,4 @@
+## 2026-05-20 - [Broken Authentication Middleware Extraction]
+**Vulnerability:** The `isAuth` middleware failed to correctly extract the JWT from the `token` cookie because it attempted to destructure a string as an object (`let { token } = req.cookies.token;`). This resulted in `token` being `undefined` even when a valid cookie was present.
+**Learning:** In Express with `cookie-parser`, `req.cookies.cookieName` returns the raw string value of the cookie. Destructuring should only be used if the cookie itself is a JSON-encoded object (which is rare and not the case here).
+**Prevention:** Always verify cookie extraction logic with integration tests. Standardize on `req.cookies?.cookieName` for safe access. Ensure authentication middleware fails with 401 status for ALL errors to prevent information leakage and accurately report the failure reason to clients.

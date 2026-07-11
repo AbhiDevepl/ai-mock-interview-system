@@ -2,22 +2,25 @@ import jwt from "jsonwebtoken";
 
 const isAuth = async (req, res, next) => {
   try {
-    let { token } = req.cookies.token;
+    const token = req.cookies?.token;
 
     if (!token) {
       return res.status(401).json({ message: "Unauthorized access." });
     }
 
-    const verifyToken = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verifyToken;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!verifyToken) {
+    if (!decoded || !decoded.userId) {
       return res.status(401).json({ message: "Unauthorized access." });
     }
-    req.userId = verifyToken.userId;
+
+    req.userId = decoded.userId;
+    req.userRole = decoded.role;
+
     next();
   } catch (error) {
-    return res.status(500).json({ message: "Internal server error." });
+    // Fail securely: return 401 for all auth-related errors including expired/invalid tokens
+    return res.status(401).json({ message: "Unauthorized access." });
   }
 };
 
