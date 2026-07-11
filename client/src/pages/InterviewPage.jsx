@@ -15,7 +15,7 @@ function InterviewPage() {
               setInterviewData(data);
               setStep(2)
             }
-        }
+          }
         />
       )}
       {step === 2 && (
@@ -30,7 +30,7 @@ function InterviewPage() {
       {step === 3 && (
         <Step3Report
         report={}
-        /> 
+        />
       )}
     </div>
   )

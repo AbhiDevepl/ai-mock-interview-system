@@ -19,8 +19,6 @@ import hrImg from "../assets/HR.png";
 import techImg from "../assets/tech.png";
 import confidenceImg from "../assets/confi.png";
 import creditImg from "../assets/credit.png";
-import Footer from './../components/Footer';
-
 function Home() {
   const { userData } = useSelector((state) => state.user);
   const [showAuth, setShowAuth] = useState(false);
@@ -285,8 +283,6 @@ function Home() {
           </div>
 
           {showAuth && <AuthModel onClose={() => setShowAuth(false)} />}
-
-          <Footer />
         </div>
       </div>
     </div>

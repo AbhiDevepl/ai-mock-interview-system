@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import authRouter from "./routers/auth.route.js";
 import userRouter from "./routers/user.route.js";
-
+import interviewRouter from "./routers/interview.route.js";
 dotenv.config();
 
 const app = express();
@@ -24,6 +24,7 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
+app.use("/api/interview", interviewRouter);
 
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err.message);
