@@ -22,9 +22,12 @@ describe("isAuth middleware", () => {
 
   it("should succeed if a valid token is provided", async () => {
     const userId = "user123";
-    const token = jwt.sign({ userId, role: "user" }, process.env.JWT_SECRET);
+    const token = jwt.sign({ userId, role: "user", type: "access" }, process.env.JWT_SECRET);
     const req = { cookies: { token } };
-    const res = {};
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
     const next = jest.fn();
 
     await isAuth(req, res, next);

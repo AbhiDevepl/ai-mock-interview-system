@@ -10,7 +10,7 @@ const isAuth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded || !decoded.userId) {
+    if (!decoded || !decoded.userId || decoded.type !== "access") {
       return res.status(401).json({ message: "Unauthorized access." });
     }
 
@@ -20,7 +20,6 @@ const isAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    // Fail securely: return 401 for all auth-related errors
     return res.status(401).json({ message: "Unauthorized access." });
   }
 };
@@ -30,7 +29,7 @@ export const optionalAuth = async (req, res, next) => {
     const token = req.cookies?.token;
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (decoded && decoded.userId) {
+      if (decoded && decoded.userId && decoded.type === "access") {
         req.user = decoded;
         req.userId = decoded.userId;
         req.userRole = decoded.role;
