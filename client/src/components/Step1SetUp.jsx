@@ -71,34 +71,51 @@ function Step1SetUp({ onStart }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6 }}
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 px-4"
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 via-gray-50 to-emerald-50/80 px-4 py-6 sm:px-6"
     >
-      <div className="w-full max-w-6xl bg-white rounded-3xl shadow-2xl grid md:grid-cols-2 overflow-hidden">
+      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl shadow-emerald-900/5 ring-1 ring-black/5 grid md:grid-cols-[0.85fr_1.15fr] overflow-hidden">
         <motion.div
           initial={{ x: -80, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.7 }}
-          className="relative bg-gradient-to-br from-green-50 to-green-100 p-12 flex flex-col items-center"
+          className="relative isolate overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-500 to-green-600 p-6 lg:p-10 flex flex-col justify-between text-white"
         >
-          <h2 className="text-4xl font-bold text-gray-800 mb-6">
-            Start Your AI Interview
-          </h2>
-          <p className="text-gray-700 mb-10 text-center">
-            Practice real interview scenarios powered by AI. Improve
-            communication, technical skills, and confidence.
-          </p>
-          <div className="space-y-5 w-full max-w-md">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-20 -left-10 h-64 w-64 rounded-full bg-green-300/20 blur-3xl"
+          />
+
+          <div className="relative">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 backdrop-blur-sm px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em]">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              AI-Powered
+            </span>
+
+            <h2 className="mt-7 text-2xl sm:text-3xl font-bold leading-[1.15] tracking-tight">
+              Start Your AI Interview
+            </h2>
+            <p className="mt-4 text-[15px] leading-relaxed text-emerald-50/90 max-w-md">
+              Practice real interview scenarios powered by AI. Improve
+              communication, technical skills, and confidence.
+            </p>
+          </div>
+
+          <div className="relative mt-8 space-y-3 w-full">
             {[
               {
-                icon: <FaUserTie className="text-green-600 text-xl" />,
+                icon: <FaUserTie className="text-emerald-600 text-lg" />,
                 text: "Choose Role & Experience",
               },
               {
-                icon: <FaMicrophoneAlt className="text-green-600 text-xl" />,
+                icon: <FaMicrophoneAlt className="text-emerald-600 text-lg" />,
                 text: "Smart Voice Interview",
               },
               {
-                icon: <FaChartLine className="text-green-600 text-xl" />,
+                icon: <FaChartLine className="text-emerald-600 text-lg" />,
                 text: "Performance Analysis",
               },
             ].map((item, index) => (
@@ -107,11 +124,15 @@ function Step1SetUp({ onStart }) {
                 initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.3 + index * 0.15 }}
-                whileHover={{ scale: 1.03 }}
-                className="flex items-center space-x-4 bg-white p-4 rounded-xl shadow-sm cursor-pointer"
+                whileHover={{ scale: 1.02 }}
+                className="flex items-center gap-4 rounded-2xl bg-white/95 p-4 shadow-lg shadow-emerald-900/10"
               >
-                {item.icon}
-                <span className="text-gray-700 font-medium">{item.text}</span>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+                  {item.icon}
+                </span>
+                <span className="text-[15px] text-gray-700 font-medium">
+                  {item.text}
+                </span>
               </motion.div>
             ))}
           </div>
@@ -121,61 +142,83 @@ function Step1SetUp({ onStart }) {
           initial={{ x: 80, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="p-12 bg-white overflow-y-auto"
+          className="p-6 lg:p-10 bg-white overflow-y-auto"
         >
-          <h2 className="text-3xl font-bold text-gray-800 mb-8">
-            Interview Setup
-          </h2>
+          <div className="mb-6">
+            <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] text-emerald-600">
+              <span className="h-px w-6 bg-emerald-500" />
+              Step 1 of 3
+            </span>
+            <h2 className="mt-3 text-2xl lg:text-3xl font-bold tracking-tight text-gray-900">
+              Interview Setup
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-gray-500">
+              Configure your session and let's get you interview-ready.
+            </p>
+          </div>
 
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Target Role <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <FaBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl" />
+                <FaBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
                 <input
                   type="text"
                   placeholder="e.g., Frontend Developer, DevOps Engineer"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   onBlur={() => validate()}
-                  className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition ${errors.role ? "border-red-300 bg-red-50" : "border-gray-200"
+                  className={`w-full pl-11 pr-4 py-3 text-gray-800 placeholder:text-gray-400 border rounded-xl focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition ${errors.role ? "border-red-300 bg-red-50" : "border-gray-200"
                     }`}
                 />
               </div>
               {errors.role && (
-                <p className="mt-1 text-sm text-red-500">{errors.role}</p>
+                <p className="mt-1.5 text-sm text-red-500">{errors.role}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Experience Level <span className="text-red-500">*</span>
               </label>
-              <select
-                value={experience}
-                onChange={(e) => setExperience(e.target.value)}
-                onBlur={() => validate()}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition appearance-none bg-white ${errors.experience
-                    ? "border-red-300 bg-red-50"
-                    : "border-gray-200"
-                  }`}
-              >
-                <option value="">Select experience level</option>
-                {EXPERIENCE_LEVELS.map((level) => (
-                  <option key={level.id} value={level.id}>
-                    {level.label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={experience}
+                  onChange={(e) => setExperience(e.target.value)}
+                  onBlur={() => validate()}
+                  className={`w-full px-4 py-3 text-gray-800 border rounded-xl focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition appearance-none bg-white pr-10 ${errors.experience
+                      ? "border-red-300 bg-red-50"
+                      : "border-gray-200"
+                    }`}
+                >
+                  <option value="">Select experience level</option>
+                  {EXPERIENCE_LEVELS.map((level) => (
+                    <option key={level.id} value={level.id}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
               {errors.experience && (
-                <p className="mt-1 text-sm text-red-500">{errors.experience}</p>
+                <p className="mt-1.5 text-sm text-red-500">{errors.experience}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Interview Mode <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-3 gap-3">
@@ -184,13 +227,13 @@ function Step1SetUp({ onStart }) {
                     key={m.id}
                     type="button"
                     onClick={() => setMode(m.id)}
-                    className={`p-4 rounded-xl border-2 text-center transition flex flex-col items-center gap-2 ${mode === m.id
-                        ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-gray-200 hover:border-green-300 text-gray-700"
+                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 ${mode === m.id
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
+                        : "border-gray-200 hover:border-emerald-300 text-gray-600"
                       }`}
                   >
                     <m.icon className="text-xl" />
-                    <span className="font-medium">{m.label}</span>
+                    <span className="font-medium text-sm">{m.label}</span>
                   </button>
                 ))}
               </div>
@@ -198,11 +241,13 @@ function Step1SetUp({ onStart }) {
 
             {/* Resume upload - always visible */}
             <motion.div
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.01 }}
               onClick={() => document.getElementById("resumeUpload")?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-xl text-center cursor-pointer hover:border-green-500 hover:bg-green-50 transition"
+              className="group border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60 transition-colors"
             >
-              <FaFileUpload className="text-4xl mx-auto text-green-600 mb-3" />
+              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+                <FaFileUpload className="text-2xl text-emerald-600" />
+              </span>
               <input
                 type="file"
                 id="resumeUpload"
@@ -213,10 +258,13 @@ function Step1SetUp({ onStart }) {
                   if (file) setResumeFile(file);
                 }}
               />
-              <p className="text-gray-600 font-medium">
+              <p className="mt-3 text-gray-700 font-medium">
                 {resumeFile
                   ? resumeFile.name
                   : "Click to upload resume (Optional)"}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                PDF up to 5MB
               </p>
               {resumeFile && (
                 <motion.button
@@ -226,7 +274,7 @@ function Step1SetUp({ onStart }) {
                     handleUploadResume();
                   }}
                   disabled={analyzing}
-                  className="mt-4 bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
                   {analyzing ? "Analyzing..." : "Analyze Resume"}
                 </motion.button>
@@ -234,15 +282,20 @@ function Step1SetUp({ onStart }) {
             </motion.div>
           </div>
 
-          <motion.button
-            onClick={handleStart}
-            disabled={!role || !experience}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.95 }}
-            className="mt-8 w-full px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            Start Interview
-          </motion.button>
+          <div className="mt-6">
+            <motion.button
+              onClick={handleStart}
+              disabled={!role || !experience}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-base shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition"
+            >
+              Start Interview
+            </motion.button>
+            <p className="mt-3 text-center text-xs text-gray-500">
+              Your session is private and secured.
+            </p>
+          </div>
         </motion.div>
       </div>
     </motion.div>
