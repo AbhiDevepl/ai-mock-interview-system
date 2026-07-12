@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "betterbugs": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.betterbugs.io/mcp",
+        "--transport",
+        "http-first"
+      ]
+    }
+  }
+}

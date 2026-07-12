@@ -41,7 +41,11 @@ export const analyzeResume = async (req, res) => {
     ];
 
     const aiResponse = await askAi(messages);
-    const parsed = JSON.parse(aiResponse);
+    const cleaned = aiResponse
+      .replace(/^\s*```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+    const parsed = JSON.parse(cleaned);
 
     fs.unlinkSync(filepath);
 
@@ -58,7 +62,7 @@ export const analyzeResume = async (req, res) => {
     }
     console.error(
       "Resume analysis error:",
-      error.response?.data || error.message,
+      error.response?.data || error.stack || error.message,
     );
     return res.status(500).json({ message: "Failed to analyze resume" });
   } finally {
