@@ -45,13 +45,15 @@ function Step1SetUp({ onStart }) {
     try {
       const formData = new FormData();
       formData.append("resume", resumeFile);
-      await axios.post(`${serverUrl}/api/resume/analyze`, formData, {
+      const response = await axios.post(`${serverUrl}/api/resume/analyze`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         withCredentials: true,
       });
+      console.log("Resume analysis server data:", response.data);
       alert("Resume analyzed successfully!");
     } catch (error) {
       console.error("Resume analysis failed:", error);
+      console.log("Resume analysis server error data:", error.response?.data);
       alert("Failed to analyze resume. Please try again.");
     } finally {
       setAnalyzing(false);
@@ -138,9 +140,8 @@ function Step1SetUp({ onStart }) {
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   onBlur={() => validate()}
-                  className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition ${
-                    errors.role ? "border-red-300 bg-red-50" : "border-gray-200"
-                  }`}
+                  className={`w-full pl-12 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition ${errors.role ? "border-red-300 bg-red-50" : "border-gray-200"
+                    }`}
                 />
               </div>
               {errors.role && (
@@ -156,11 +157,10 @@ function Step1SetUp({ onStart }) {
                 value={experience}
                 onChange={(e) => setExperience(e.target.value)}
                 onBlur={() => validate()}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition appearance-none bg-white ${
-                  errors.experience
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition appearance-none bg-white ${errors.experience
                     ? "border-red-300 bg-red-50"
                     : "border-gray-200"
-                }`}
+                  }`}
               >
                 <option value="">Select experience level</option>
                 {EXPERIENCE_LEVELS.map((level) => (
@@ -184,11 +184,10 @@ function Step1SetUp({ onStart }) {
                     key={m.id}
                     type="button"
                     onClick={() => setMode(m.id)}
-                    className={`p-4 rounded-xl border-2 text-center transition flex flex-col items-center gap-2 ${
-                      mode === m.id
+                    className={`p-4 rounded-xl border-2 text-center transition flex flex-col items-center gap-2 ${mode === m.id
                         ? "border-green-500 bg-green-50 text-green-700"
                         : "border-gray-200 hover:border-green-300 text-gray-700"
-                    }`}
+                      }`}
                   >
                     <m.icon className="text-xl" />
                     <span className="font-medium">{m.label}</span>
