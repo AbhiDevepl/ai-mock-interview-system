@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { BsRobot, BsTwitterX, BsLinkedin, BsGithub, BsEnvelope } from "react-icons/bs";
 
 const navLinks = [
@@ -22,15 +23,22 @@ const currentYear = new Date().getFullYear();
 
 function Footer() {
   return (
-    <footer className="bg-white border-t border-gray-200" role="contentinfo">
-      <div className="max-w-6xl mx-auto px-6 py-12 md:py-16">
+    <footer className="bg-white" role="contentinfo">
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-green-500 to-transparent" />
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5 }}
+        className="max-w-6xl mx-auto px-6 py-12 md:py-16"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-black text-white p-2 rounded-lg">
                 <BsRobot size={18} />
               </div>
-              <span className="font-semibold text-lg hidden md:block">InterviewIQ.AI</span>
+              <span className="font-semibold text-base md:text-lg">InterviewIQ.AI</span>
             </div>
             <p className="text-gray-500 text-sm leading-relaxed">
               AI Powered Mock Interview System
@@ -44,9 +52,10 @@ function Footer() {
                 <li key={link.href}>
                   <a
                     href={link.href}
-                    className="text-gray-500 text-sm hover:text-green-600 transition-colors"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors"
                   >
                     {link.label}
+                    <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-green-600 transition-all duration-200 group-hover:w-full" />
                   </a>
                 </li>
               ))}
@@ -60,9 +69,10 @@ function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-gray-500 text-sm hover:text-green-600 transition-colors"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors"
                   >
                     {link.label}
+                    <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-green-600 transition-all duration-200 group-hover:w-full" />
                   </a>
                 </li>
               ))}
@@ -71,27 +81,40 @@ function Footer() {
 
           <div>
             <h3 className="font-semibold text-gray-900 mb-4">Connect</h3>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               {socialLinks.map((social) => (
-                <a
+                <motion.a
                   key={social.label}
                   href={social.href}
-                  className="text-gray-400 hover:text-green-600 transition-colors"
+                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
                   aria-label={social.label}
                 >
-                  <social.icon size={20} />
-                </a>
+                  <social.icon size={18} />
+                </motion.a>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-gray-200">
-          <p className="text-center text-gray-500 text-sm">
+        <div className="mt-10 pt-6 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-gray-500 text-sm">
             &copy; {currentYear} InterviewIQ.AI. All rights reserved.
           </p>
+          <div className="flex items-center gap-6">
+            {legalLinks.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="text-gray-500 text-sm hover:text-green-600 transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
         </div>
-      </div>
+      </motion.div>
     </footer>
   );
 }

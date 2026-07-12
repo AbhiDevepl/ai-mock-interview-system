@@ -6,6 +6,7 @@ import {
   FaFileUpload,
   FaMicrophoneAlt,
   FaChartLine,
+  FaTimes,
 } from "react-icons/fa";
 import axios from "axios";
 import { serverUrl } from "../config";
@@ -30,6 +31,7 @@ function Step1SetUp({ onStart }) {
   const [errors, setErrors] = useState({});
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -50,7 +52,7 @@ function Step1SetUp({ onStart }) {
         withCredentials: true,
       });
       console.log("Resume analysis server data:", response.data);
-      alert("Resume analyzed successfully!");
+      //alert("Resume analyzed successfully!");
     } catch (error) {
       console.error("Resume analysis failed:", error);
       console.log("Resume analysis server error data:", error.response?.data);
@@ -239,11 +241,77 @@ function Step1SetUp({ onStart }) {
               </div>
             </div>
 
-            {/* Resume upload - always visible */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Resume
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsUploadOpen(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                  <FaFileUpload className="text-emerald-600" />
+                </span>
+                <span
+                  className={`truncate font-medium ${
+                    resumeFile ? "text-gray-800" : "text-gray-500"
+                  }`}
+                >
+                  {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <motion.button
+              onClick={handleStart}
+              disabled={!role || !experience}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-base shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition"
+            >
+              Start Interview
+            </motion.button>
+            <p className="mt-3 text-center text-xs text-gray-500">
+              Your session is private and secured.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+
+      {isUploadOpen && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={() => setIsUploadOpen(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
+          >
+            <button
+              type="button"
+              onClick={() => setIsUploadOpen(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-black transition-colors cursor-pointer"
+            >
+              <FaTimes size={18} />
+            </button>
+
+            <h3 className="text-lg font-bold tracking-tight text-gray-900">
+              Upload Resume
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Attach your resume to personalize the interview.
+            </p>
+
             <motion.div
               whileHover={{ scale: 1.01 }}
               onClick={() => document.getElementById("resumeUpload")?.click()}
-              className="group border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60 transition-colors"
+              className="group mt-5 border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60 transition-colors"
             >
               <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
                 <FaFileUpload className="text-2xl text-emerald-600" />
@@ -263,11 +331,10 @@ function Step1SetUp({ onStart }) {
                   ? resumeFile.name
                   : "Click to upload resume (Optional)"}
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">
-                PDF up to 5MB
-              </p>
+              <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
               {resumeFile && (
                 <motion.button
+                  type="button"
                   whileHover={{ scale: 1.02 }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -280,24 +347,17 @@ function Step1SetUp({ onStart }) {
                 </motion.button>
               )}
             </motion.div>
-          </div>
 
-          <div className="mt-6">
-            <motion.button
-              onClick={handleStart}
-              disabled={!role || !experience}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              className="w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-base shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition"
+            <button
+              type="button"
+              onClick={() => setIsUploadOpen(false)}
+              className="mt-5 w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 transition cursor-pointer"
             >
-              Start Interview
-            </motion.button>
-            <p className="mt-3 text-center text-xs text-gray-500">
-              Your session is private and secured.
-            </p>
-          </div>
-        </motion.div>
-      </div>
+              Done
+            </button>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }
