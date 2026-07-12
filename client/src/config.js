@@ -8,7 +8,7 @@ const config = {
     (import.meta.env.VITE_SERVER_URL || "http://localhost:8000").replace(
       /\/+$/,
       "",
-    ) + "/",
+    ),
 
   firebase: {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
