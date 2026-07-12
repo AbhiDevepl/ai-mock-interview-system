@@ -7,6 +7,7 @@ import {
   FaMicrophoneAlt,
   FaChartLine,
   FaTimes,
+  FaCheckCircle,
 } from "react-icons/fa";
 import axios from "axios";
 import { serverUrl } from "../config";
@@ -31,7 +32,15 @@ function Step1SetUp({ onStart }) {
   const [errors, setErrors] = useState({});
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
+  const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+
+  const closeUploadModal = () => {
+    setIsUploadOpen(false);
+    setAnalysisStatus(null);
+    setAnalysisError("");
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -44,6 +53,8 @@ function Step1SetUp({ onStart }) {
   const handleUploadResume = async () => {
     if (!resumeFile) return;
     setAnalyzing(true);
+    setAnalysisStatus(null);
+    setAnalysisError("");
     try {
       const formData = new FormData();
       formData.append("resume", resumeFile);
@@ -52,11 +63,18 @@ function Step1SetUp({ onStart }) {
         withCredentials: true,
       });
       console.log("Resume analysis server data:", response.data);
-      //alert("Resume analyzed successfully!");
+      setAnalysisStatus("success");
+      setTimeout(() => {
+        setIsUploadOpen(false);
+        setAnalysisStatus(null);
+      }, 1300);
     } catch (error) {
       console.error("Resume analysis failed:", error);
       console.log("Resume analysis server error data:", error.response?.data);
-      alert("Failed to analyze resume. Please try again.");
+      setAnalysisStatus("error");
+      setAnalysisError(
+        error.response?.data?.message || "Failed to analyze resume. Please try again."
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -284,7 +302,7 @@ function Step1SetUp({ onStart }) {
       {isUploadOpen && (
         <div
           className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
-          onClick={() => setIsUploadOpen(false)}
+          onClick={closeUploadModal}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -295,7 +313,7 @@ function Step1SetUp({ onStart }) {
           >
             <button
               type="button"
-              onClick={() => setIsUploadOpen(false)}
+              onClick={closeUploadModal}
               className="absolute top-4 right-4 text-gray-500 hover:text-black transition-colors cursor-pointer"
             >
               <FaTimes size={18} />
@@ -309,13 +327,18 @@ function Step1SetUp({ onStart }) {
             </p>
 
             <motion.div
-              whileHover={{ scale: 1.01 }}
-              onClick={() => document.getElementById("resumeUpload")?.click()}
-              className="group mt-5 border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60 transition-colors"
+              whileHover={analysisStatus === "success" ? undefined : { scale: 1.01 }}
+              onClick={
+                analysisStatus === "success"
+                  ? undefined
+                  : () => document.getElementById("resumeUpload")?.click()
+              }
+              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
+                analysisStatus === "success"
+                  ? "border-emerald-300 bg-emerald-50/60"
+                  : "border-gray-300 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60"
+              }`}
             >
-              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
-                <FaFileUpload className="text-2xl text-emerald-600" />
-              </span>
               <input
                 type="file"
                 id="resumeUpload"
@@ -326,31 +349,53 @@ function Step1SetUp({ onStart }) {
                   if (file) setResumeFile(file);
                 }}
               />
-              <p className="mt-3 text-gray-700 font-medium">
-                {resumeFile
-                  ? resumeFile.name
-                  : "Click to upload resume (Optional)"}
-              </p>
-              <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
-              {resumeFile && (
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.02 }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUploadResume();
-                  }}
-                  disabled={analyzing}
-                  className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  {analyzing ? "Analyzing..." : "Analyze Resume"}
-                </motion.button>
+              {analysisStatus === "success" ? (
+                <>
+                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+                    <FaCheckCircle className="text-2xl text-emerald-600" />
+                  </span>
+                  <p className="mt-3 text-emerald-700 font-medium">
+                    Resume analyzed successfully
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+                    <FaFileUpload className="text-2xl text-emerald-600" />
+                  </span>
+                  <p className="mt-3 text-gray-700 font-medium">
+                    {resumeFile
+                      ? resumeFile.name
+                      : "Click to upload resume (Optional)"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
+                  {resumeFile && (
+                    <motion.button
+                      type="button"
+                      whileHover={{ scale: 1.02 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUploadResume();
+                      }}
+                      disabled={analyzing}
+                      className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      {analyzing ? "Analyzing..." : "Analyze Resume"}
+                    </motion.button>
+                  )}
+                </>
               )}
             </motion.div>
 
+            {analysisStatus === "error" && (
+              <p className="mt-3 text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">
+                {analysisError}
+              </p>
+            )}
+
             <button
               type="button"
-              onClick={() => setIsUploadOpen(false)}
+              onClick={closeUploadModal}
               className="mt-5 w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 transition cursor-pointer"
             >
               Done
