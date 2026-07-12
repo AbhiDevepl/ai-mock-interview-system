@@ -7,6 +7,7 @@ import Auth from "./pages/Auth";
 import NavBar from "./components/NavBar";
 import Footer from "./components/Footer";
 import { setUserData } from "./redux/userSlice";
+import InterviewPage from "./pages/InterviewPage.jsx";
 
 const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
 
@@ -33,46 +34,7 @@ function App() {
         <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/dashboard"
-          element={
-            <div className="flex items-center justify-center min-h-[60vh] text-gray-500">
-              Dashboard Page — Coming Soon
-            </div>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <div className="flex items-center justify-center min-h-[60vh] text-gray-500">
-              Profile Page — Coming Soon
-            </div>
-          }
-        />
-        <Route
-          path="/interview"
-          element={
-            <div className="flex items-center justify-center min-h-[60vh] text-gray-500">
-              Interview Page — Coming Soon
-            </div>
-          }
-        />
-        <Route
-          path="/history"
-          element={
-            <div className="flex items-center justify-center min-h-[60vh] text-gray-500">
-              History Page — Coming Soon
-            </div>
-          }
-        />
-        <Route
-          path="/pricing"
-          element={
-            <div className="flex items-center justify-center min-h-[60vh] text-gray-500">
-              Pricing Page — Coming Soon
-            </div>
-          }
-        />
+        <Route path="/interview" element={< InterviewPage/>} />
         <Route path="*" element={<div>404 - Page Not Found</div>} />
         </Routes>
       </main>
