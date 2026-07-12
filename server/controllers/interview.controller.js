@@ -45,15 +45,13 @@ export const analyzeResume = async (req, res) => {
 
     fs.unlinkSync(filepath);
 
-    res.json({
+    return res.status(200).json({
       role: parsed.role,
       experience: parsed.experience,
       projects: parsed.projects,
       skills: parsed.skills,
       resumeText,
     });
-
-    return res.status(200).json(parsed);
   } catch (error) {
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
