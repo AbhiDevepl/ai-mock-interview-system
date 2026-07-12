@@ -7,6 +7,8 @@ import {
   FaMicrophoneAlt,
   FaChartLine,
 } from "react-icons/fa";
+import axios from "axios";
+import { serverUrl } from "../config";
 
 const MODES = [
   { id: "Technical", label: "Technical", icon: FaBriefcase },
@@ -26,6 +28,8 @@ function Step1SetUp({ onStart }) {
   const [experience, setExperience] = useState("");
   const [mode, setMode] = useState("Technical");
   const [errors, setErrors] = useState({});
+  const [resumeFile, setResumeFile] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -35,9 +39,28 @@ function Step1SetUp({ onStart }) {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleUploadResume = async () => {
+    if (!resumeFile) return;
+    setAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append("resume", resumeFile);
+      await axios.post(`${serverUrl}/api/resume/analyze`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        withCredentials: true,
+      });
+      alert("Resume analyzed successfully!");
+    } catch (error) {
+      console.error("Resume analysis failed:", error);
+      alert("Failed to analyze resume. Please try again.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleStart = () => {
     if (validate()) {
-      onStart({ role, experience, mode });
+      onStart({ role, experience, mode, resumeFile });
     }
   };
 
@@ -173,15 +196,54 @@ function Step1SetUp({ onStart }) {
                 ))}
               </div>
             </div>
+
+            {/* Resume upload - always visible */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              onClick={() => document.getElementById("resumeUpload")?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl text-center cursor-pointer hover:border-green-500 hover:bg-green-50 transition"
+            >
+              <FaFileUpload className="text-4xl mx-auto text-green-600 mb-3" />
+              <input
+                type="file"
+                id="resumeUpload"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) setResumeFile(file);
+                }}
+              />
+              <p className="text-gray-600 font-medium">
+                {resumeFile
+                  ? resumeFile.name
+                  : "Click to upload resume (Optional)"}
+              </p>
+              {resumeFile && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUploadResume();
+                  }}
+                  disabled={analyzing}
+                  className="mt-4 bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {analyzing ? "Analyzing..." : "Analyze Resume"}
+                </motion.button>
+              )}
+            </motion.div>
           </div>
 
-          <button
+          <motion.button
             onClick={handleStart}
             disabled={!role || !experience}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
             className="mt-8 w-full px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             Start Interview
-          </button>
+          </motion.button>
         </motion.div>
       </div>
     </motion.div>
