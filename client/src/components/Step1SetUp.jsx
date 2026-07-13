@@ -102,7 +102,7 @@ function Step1SetUp({ onStart }) {
       setLoading(false);
       onStart(result.data);
     } catch (error) {
-      //console.log("generate-question error:", error.response?.data || error.message);
+      console.log("generate-question error:", error.response?.data || error.message);
       setLoading(false);
     }
   };
