@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { useSelector } from "react-redux";
+import { motion } from "motion/react";
 import { selectUser } from "../redux/userSlice";
 import { FaTimes } from "react-icons/fa";
 import Auth from "../pages/Auth";
@@ -14,17 +15,27 @@ function AuthModel({ onClose }) {
   }, [userData, onClose]);
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/10 backdrop-blur-sm px-4">
-      <div className="relative w-full max-w-md">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      onClick={() => onClose()}
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md"
+      >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-8 right-5 text-gray-800 hover:text-black text-xl"
+          className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-black cursor-pointer"
         >
           <FaTimes size={18} />
         </button>
         <Auth isModal={true} />
       </div>
-    </div>
+    </motion.div>
   );
 }
 

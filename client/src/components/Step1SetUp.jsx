@@ -18,12 +18,7 @@ const MODES = [
   { id: "System Design", label: "System Design", icon: FaChartLine },
 ];
 
-const EXPERIENCE_LEVELS = [
-  { id: "entry", label: "Entry Level (0-2 years)" },
-  { id: "mid", label: "Mid Level (3-5 years)" },
-  { id: "senior", label: "Senior (6-10 years)" },
-  { id: "lead", label: "Lead/Principal (10+ years)" },
-];
+
 
 function Step1SetUp({ onStart }) {
   const [role, setRole] = useState("");
@@ -35,6 +30,7 @@ function Step1SetUp({ onStart }) {
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
   const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
 
   const closeUploadModal = () => {
     setIsUploadOpen(false);
@@ -63,10 +59,10 @@ function Step1SetUp({ onStart }) {
         withCredentials: true,
       });
       console.log("Resume analysis server data:", response.data);
+      setAnalysisResult(response.data);
       setAnalysisStatus("success");
       setTimeout(() => {
         setIsUploadOpen(false);
-        setAnalysisStatus(null);
       }, 1300);
     } catch (error) {
       console.error("Resume analysis failed:", error);
@@ -204,33 +200,18 @@ function Step1SetUp({ onStart }) {
                 Experience Level <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <select
+                <FaBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
+                <input
+                  type="text"
+                  placeholder="e.g., 3 years, Senior, Mid-level"
                   value={experience}
                   onChange={(e) => setExperience(e.target.value)}
                   onBlur={() => validate()}
-                  className={`w-full px-4 py-3 text-gray-800 border rounded-xl focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition appearance-none bg-white pr-10 ${errors.experience
+                  className={`w-full pl-11 pr-4 py-3 text-gray-800 placeholder:text-gray-400 border rounded-xl focus:ring-4 focus:ring-emerald-500/15 focus:border-emerald-500 outline-none transition ${errors.experience
                       ? "border-red-300 bg-red-50"
                       : "border-gray-200"
                     }`}
-                >
-                  <option value="">Select experience level</option>
-                  {EXPERIENCE_LEVELS.map((level) => (
-                    <option key={level.id} value={level.id}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                />
               </div>
               {errors.experience && (
                 <p className="mt-1.5 text-sm text-red-500">{errors.experience}</p>
@@ -281,7 +262,41 @@ function Step1SetUp({ onStart }) {
               </button>
             </div>
           </div>
+          {analysisStatus === "success" && analysisResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gray-50 border-gray-200 rounded-xl p-5 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Resume Analysis Result
+              </h3>
+              {analysisResult.projects?.length > 0 && (
+                <div>
+                  <p className="font-medium text-gray-700 mb-1">
+                    Projects:
+                  </p>
+                  <ul className="list-disc list-inside text-gray-600 space-y-1">
+                    {analysisResult.projects.map((p, i) => (
+                      <li key={i}>{p}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {analysisResult.skills?.length > 0 && (
+                <div>
+                  <p className="font-medium text-gray-700 mb-1">
+                    Skills:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {analysisResult.skills.map((s, i) => (
+                      <span key={i} className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm" >{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
+            </motion.div>
+          )}
           <div className="mt-6">
             <motion.button
               onClick={handleStart}
@@ -304,7 +319,7 @@ function Step1SetUp({ onStart }) {
           className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
           onClick={closeUploadModal}
         >
-          <motion.div
+          <motion.div list-disc list-inside text-gray-600 space-y-1
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.25 }}
