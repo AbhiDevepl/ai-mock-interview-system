@@ -60,6 +60,10 @@ function Step1SetUp({ onStart }) {
       });
       console.log("Resume analysis server data:", response.data);
       setAnalysisResult(response.data);
+      const r = response.data?.role;
+      const e = response.data?.experience;
+      if (r && String(r).trim()) setRole(r);
+      if (e && String(e).trim()) setExperience(e);
       setAnalysisStatus("success");
       setTimeout(() => {
         setIsUploadOpen(false);
