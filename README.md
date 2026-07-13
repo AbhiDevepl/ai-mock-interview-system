@@ -1,105 +1,60 @@
-# 🤖 AI Mock Interview System
+# InterviewIQ.AI — AI Mock Interview System
 
-A comprehensive, full-stack application designed to help job seekers practice and perfect their interview skills. This system utilizes AI to analyze candidate responses and provide real-time, actionable feedback across a custom-tailored interview environment.
+A full-stack, AI-powered mock interview platform. Candidates upload a resume (or enter details manually); the backend extracts structured data and uses Groq to generate tailored interview questions and feedback.
 
-## 🌟 Key Features
+## Tech Stack
 
-*   **Secure Authentication:** Google Sign-In using Firebase Authentication seamlessly integrated with a custom backend stateless JWT with silent refresh token rotation.
-*   **Specialized Interview Setups:** Users can configure interview parameters like difficulty, domain (e.g., frontend, backend), and interview style.
-*   **Real-time Interview Room:** A focused environment for conducting mock interviews.
-*   **Comprehensive Results & Feedback:** Detailed performance reports after each interview session highlighting strengths and areas for improvement.
-*   **Dashboard & History:** Personal dashboard to track progress, access past interview histories, and review previous feedback.
-*   **Profile Settings:** Manage personal information, preferences, and account configurations.
+| Layer | Technology (versions from `package.json`) |
+|-------|-------------------------------------------|
+| Frontend | React `19.2`, Vite `8.0`, React Router `7.14`, Tailwind CSS `4.2` (`@tailwindcss/vite`), Redux Toolkit `2.11` + react-redux `9.2`, Firebase Auth `12.12`, axios `1.15`, sonner `2.0`, motion `12.38` (framer-motion also present), lucide-react `1.8`, react-icons `5.6`, clsx `2.1`, tailwind-merge `3.5` |
+| Backend | Node.js + Express `4.22`, Mongoose `7.8` (MongoDB driver bundled), jsonwebtoken `9.0`, cookie-parser `1.4.7`, cors `2.8.6`, helmet `8.2`, dotenv `16.6`, firebase-admin `13.10`, multer `2.2` (resume upload), pdfjs-dist `6.1` (PDF text extraction), uuid `10.0`, axios `1.18` |
+| AI | Groq `llama-3.3-70b-versatile` via `https://api.groq.com/openai/v1/chat/completions` (key: `GROQ_API_KEY`) |
+| Database | MongoDB (local or Atlas) via Mongoose |
 
-## 🏗️ Technology Stack
+> Notes: `react-hook-form`, `zod`, and `express-rate-limit` are present in `package.json` but are **not yet wired into application code**. The AI client lives in `server/services/openRouter.service.js` (name is legacy — it calls Groq, not OpenRouter).
 
-The project is structured entirely as a Monorepo containing a `client` and a `server` application.
+## Prerequisites
 
-### Frontend (`/client`)
-*   **Core:** React 19, Vite
-*   **Routing:** React Router v7
-*   **Styling & UI:** Tailwind CSS v4, Lucide React, react-icons, clsx, tailwind-merge
-*   **Forms & Validation:** React Hook Form, Zod
-*   **Authentication:** Firebase Auth v12
-*   **State / Fetching:** Axios
-*   **Notifications:** Sonner
+- Node.js (LTS recommended; no `engines` constraint is set in either `package.json`).
+- A MongoDB instance (local `mongod` or Atlas connection string).
+- A Firebase project (for Google Sign-In) and a Groq API key.
+
+This is **not** a monorepo with workspace tooling — `client/` and `server/` are two independent packages. Install and run them separately.
+
+## Setup
 
 ### Backend (`/server`)
-*   **Core:** Node.js, Express.js
-*   **Database:** MongoDB, Mongoose
-*   **Authentication:** JSON Web Tokens (JWT), cookie-parser
-*   **Middleware:** CORS, dotenv
-
-## 🚀 Getting Started
-
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing.
-
-### Prerequisites
-
-*   **Node.js** (v18+ recommended)
-*   **npm** (bundled with Node.js)
-*   **MongoDB** database (Local instance or MongoDB Atlas cluster)
-*   **Firebase Project** setup (for authentication credentials)
-
-This project uses npm only. Run commands separately inside `client/` and `server/`; there is no package-manager workspace configuration.
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/yourusername/ai-mock-interview-system.git
-cd ai-mock-interview-system
-```
-
-### 2. Backend Setup
-
-Open a new terminal and navigate to the backend directory:
-
 ```bash
 cd server
 npm install
 ```
-
-Create a `.env` file in the `server` directory and configure the following environment variables:
-
+Create `server/.env`:
 ```env
 PORT=8000
 MONGODB_URL=mongodb://localhost:27017/ai-mock-interview-system
 JWT_SECRET=your_super_secret_jwt_key
 CLIENT_URL=http://localhost:5173
 
-# Firebase Admin SDK Configuration
+# Firebase Admin SDK
 FIREBASE_PROJECT_ID=your-firebase-project-id
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk@example.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-```
 
-Start the backend development server:
+# Groq (REQUIRED — AI calls fail without it)
+GROQ_API_KEY=your_groq_api_key
+```
+> Keep `FIREBASE_PRIVATE_KEY` as a literal `\n` (single backslash-n); the server converts `\\n` → newline at runtime. `PORT` must be `8000` to match the client's default `VITE_SERVER_URL` (`http://localhost:8000`).
 
 ```bash
-npm run dev
+npm run dev      # nodemon
 ```
 
-The backend should now be running on `http://localhost:5000`.
-
-For production, install production dependencies and start the server with:
-
-```bash
-cd server
-npm install --omit=dev
-npm start
-```
-
-### 3. Frontend Setup
-
-Open another terminal and navigate to the frontend directory:
-
+### Frontend (`/client`)
 ```bash
 cd client
 npm install
 ```
-
-Create a `.env` file in the `client` directory and configure your Firebase keys:
-
+Create `client/.env` (Firebase web config):
 ```env
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
@@ -107,105 +62,82 @@ VITE_FIREBASE_PROJECT_ID=your_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
+# Optional — defaults to http://localhost:8000
+# VITE_SERVER_URL=http://localhost:8000
 ```
-
-Start the frontend development server:
-
 ```bash
-npm run dev
+npm run dev       # vite (port 5173)
 ```
 
-The application should now be accessible at `http://localhost:5173`.
+## Scripts
 
-Build the frontend for production:
+| Package | Command | Purpose |
+|---------|---------|---------|
+| server | `npm run dev` | nodemon dev server |
+| server | `npm start` | production start (`node server.js`) |
+| server | `npm test` | Jest (`--experimental-vm-modules`, `--force-exit`) |
+| server | `npm run test:authcat` | targets `__tests__/authcat-validation.test.js` (file not present yet) |
+| client | `npm run dev` | vite dev server |
+| client | `npm run build` | production build |
+| client | `npm run lint` | ESLint (flat config) |
+| client | `npm run preview` | preview built output |
 
-```bash
-cd client
-npm install
-npm run build
+> **Testing status:** Test tooling is wired but **no test specs exist in the repo yet**; `npm run test:authcat` points at a not-yet-created file. `npm test` currently runs with zero tests.
+
+## API
+
+Base URL: `http://localhost:8000` (path prefix `/api`). Auth: JWT in the `token` HttpOnly cookie (set by `/api/auth/google`).
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| POST | `/api/auth/google` | public | Verifies Firebase ID token, issues 7-day `access` JWT cookie, upserts user |
+| POST | `/api/auth/logout` | optional | Clears `token` cookie |
+| GET  | `/api/auth/me` | required | Current user |
+| GET  | `/api/user/current-user` | required | Current user (used by client bootstrap) |
+| POST | `/api/interview/resume` | required | Multipart `resume` PDF → analysis (same handler as below) |
+| POST | `/api/resume/analyze` | required | Multipart `resume` PDF → text extraction + Groq → `{role, experience, skills, projects, resumeText}` |
+| POST | `/api/interview/generate-question` | required | Body `{role, experience, mode, resumeText, skills, projects}` → 5 questions, deducts 50 credits |
+| POST | `/api/interview/submit-answer` | required | Body `{interviewId, questionIndex, answer, timeTaken}` → score/feedback |
+| GET  | `/api/interview/finish` | required | Finalize interview |
+
+> `analyzeResume` is mounted at **both** `/api/interview/resume` and `/api/resume/analyze` (identical behavior).
+
+## Core Features (verified in code)
+
+- **Google Sign-In** — Firebase Admin verifies the ID token; backend issues a stateless JWT cookie.
+- **Resume analysis** — PDF uploaded server-side, text extracted with `pdfjs-dist`, then sent to Groq to extract role / experience / skills / projects.
+- **AI interview generation** — Groq produces 5 mode-specific questions; each generation costs 50 credits (users start with 100).
+- **Interview session & answers** — candidates answer; backend scores and gives feedback per question.
+- **Results & report** — final performance report rendered in-step (Step 3) of the interview flow.
+- **Credits** — tracked on the `User` model, deducted per generated interview.
+
+Not yet implemented (do not document as features): Dashboard, History, and Profile pages; refresh-token rotation; rate limiting.
+
+## Folder Structure
+
 ```
-
-Preview a production build locally:
-
-```bash
-cd client
-npm run preview
-```
-
-## 🧪 Testing
-
-The backend includes a comprehensive validation suite for stateless JWT, Refresh Token Rotation, and logout logic.
-
-To run the tests:
-
-```bash
-cd server
-npm test
-```
-
-```bash
-cd client
-npm run lint
-```
-
-The client has linting configured through npm. There is no `npm test` script in `client/package.json`.
-
-## 📦 NPM Command Reference
-
-### Client
-
-```bash
-cd client
-npm install
-npm run dev
-npm run build
-npm run lint
-```
-
-### Server
-
-```bash
-cd server
-npm install
-npm run dev
-npm start
-npm test
-```
-
-## 📂 Project Structure
-
-```text
 ai-mock-interview-system/
-├── client/                 # React frontend application
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/          # Application routes/screens (Auth, Dashboard, etc.)
-│   │   ├── utils/          # Helper functions (e.g., Firebase config)
-│   │   └── App.jsx         # Main application entry
-│   ├── package.json
-│   └── vite.config.js
-├── server/                 # Express backend application
-│   ├── models/             # Mongoose database schemas
-│   ├── routes/             # Express API routes
-│   ├── controllers/        # Route logic and handlers
-│   ├── middleware/         # Custom middleware (e.g., isAuth.js)
-│   ├── server.js           # Main backend entry point
-│   └── package.json
-├── mvp.md                  # Development notes & IDs
-├── Dockerfile              # Containerization configuration
-└── README.md               # Project documentation
+├── client/                      # React frontend
+│   └── src/
+│       ├── components/          # AuthModel, NavBar, Footer, Step1SetUp, Step2Interview, Step3Report
+│       ├── pages/               # Home, Auth, InterviewPage, InterviewReport (unused)
+│       ├── redux/               # store.js, userSlice.js
+│       ├── utils/               # firebase.js
+│       ├── App.jsx
+│       └── main.jsx             # Redux <Provider> + <BrowserRouter>
+├── server/                      # Express backend
+│   ├── config/                  # connectDB.js, token.js
+│   ├── controllers/             # auth, user, interview
+│   ├── middleware/              # isAuth.js (JWT), multer.js (upload)
+│   ├── models/                  # user.model.js, interview.model.js
+│   ├── routers/                 # auth, user, interview, resume
+│   ├── services/                # openRouter.service.js (Groq client)
+│   └── server.js
+├── Dockerfile
+└── README.md
 ```
 
-## 🤝 Contributing
+## Known Constraints
 
-Contributions, issues, and feature requests are welcome!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License.
+- **Groq rate limits** (llama-3.3-70b-versatile free tier is commonly ~30 RPM / 1,000 RPD / 12,000 TPM — *verify against current Groq docs*, as limits vary by tier). Each interview triggers 1–2 Groq calls.
+- The `token` cookie is a single 7-day `access` token; there is currently no refresh flow.
