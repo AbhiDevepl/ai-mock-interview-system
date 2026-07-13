@@ -3,9 +3,9 @@ import User from "../models/user.model.js";
 export const getCurrentUser = async (req, res) => {
   try {
     const userId = req.userId;
-    const user = await User.findById(userId).select('-firebaseUID -isActive');
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
+    const user = await User.findById(userId).select("-firebaseUID");
+    if (!user || !user.isActive) {
+      return res.status(401).json({ message: "Authentication required." });
     }
     return res.status(200).json(user);
   } catch (error) {

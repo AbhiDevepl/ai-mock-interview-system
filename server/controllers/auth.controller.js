@@ -5,16 +5,25 @@ import User from "../models/user.model.js";
 import { genToken, genAccessToken, genRefreshToken } from "../config/token.js";
 
 // Firebase Admin — initialised once per process
+let adminAuth;
 if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+
+  if (projectId && clientEmail && privateKey) {
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+    adminAuth = getAuth();
+  }
+} else {
+  adminAuth = getAuth();
 }
-const adminAuth = getAuth();
 
 // Cookie options (inline — no separate cookie.js file)
 const isProduction = process.env.NODE_ENV === "production";
@@ -62,6 +71,9 @@ export const googleAuth = async (req, res) => {
 
     let decodedToken;
     try {
+      if (!adminAuth) {
+        throw new Error("Firebase Admin not initialized");
+      }
       decodedToken = await adminAuth.verifyIdToken(idToken);
     } catch {
       return res.status(401).json({ message: "Authentication failed." });
@@ -84,10 +96,12 @@ export const googleAuth = async (req, res) => {
         lastLoginAt: new Date(),
       });
     } else {
+      if (!user.isActive) {
+        return res.status(403).json({ message: "Your account has been deactivated." });
+      }
       if (photo) user.picture = photo;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
-      if (!user.isActive) user.isActive = true;
       await user.save();
     }
 

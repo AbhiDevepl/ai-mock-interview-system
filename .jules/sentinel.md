@@ -1,0 +1,4 @@
+## 2026-02-12 - [HIGH] Fix deactivation bypass and add security hardening
+**Vulnerability:** Deactivated users could bypass their account suspension by simply logging back in via Google Auth, which would automatically set `isActive` to true. Additionally, the `/api/user/current-user` endpoint did not verify the user's active status, allowing users with existing sessions to continue using the app after deactivation.
+**Learning:** Authentication flows that "upsert" users on login can accidentally revert administrative actions (like deactivation) if they don't explicitly check the existing user's state before updating and issuing new tokens.
+**Prevention:** Always check for `isActive: false` (or similar status flags) early in the authentication logic, before updating user records or issuing tokens. Ensure all authenticated endpoints (or the authentication middleware itself) periodically verify the user's status against the database.
