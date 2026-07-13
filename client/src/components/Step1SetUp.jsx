@@ -11,7 +11,8 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import { serverUrl } from "../config";
-
+import { useSelector, useDispatch } from "react-redux";
+import { setUserData } from "../redux/userSlice";
 const MODES = [
   { id: "Technical", label: "Technical", icon: FaBriefcase },
   { id: "Behavioral", label: "Behavioral", icon: FaUserTie },
@@ -21,6 +22,9 @@ const MODES = [
 
 
 function Step1SetUp({ onStart }) {
+  const [loading, setLoading] = useState(false);
+  const {userData}= useSelector((state)=>state.user);
+  const dispatch = useDispatch();
   const [role, setRole] = useState("");
   const [experience, setExperience] = useState("");
   const [mode, setMode] = useState("Technical");
@@ -80,12 +84,28 @@ function Step1SetUp({ onStart }) {
     }
   };
 
-  const handleStart = () => {
-    if (validate()) {
-      onStart({ role, experience, mode, resumeFile });
+  const handleStart = async () => {
+    setLoading(true);
+    try {
+      const resumeText = analysisResult?.resumeText || "";
+      const skills = analysisResult?.skills || [];
+      const projects = analysisResult?.projects || [];
+      const result = await axios.post(
+        `${serverUrl}/api/interview/generate-question`,
+        { role, experience, mode, resumeText, skills, projects },
+        { withCredentials: true }
+      );
+      console.log(result.data);
+      if (userData) {
+        dispatch(setUserData({ ...userData, credits: result.data.creditLeft }));
+      }
+      setLoading(false);
+      onStart(result.data);
+    } catch (error) {
+      console.log(error);
+      setLoading(false);
     }
   };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -304,12 +324,12 @@ function Step1SetUp({ onStart }) {
           <div className="mt-6">
             <motion.button
               onClick={handleStart}
-              disabled={!role || !experience}
+              disabled={!role || !experience || loading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               className="w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-base shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition"
             >
-              Start Interview
+              {loading? "Processing..." : "Start Interview"}
             </motion.button>
             <p className="mt-3 text-center text-xs text-gray-500">
               Your session is private and secured.
@@ -323,7 +343,7 @@ function Step1SetUp({ onStart }) {
           className="fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
           onClick={closeUploadModal}
         >
-          <motion.div list-disc list-inside text-gray-600 space-y-1
+          <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.25 }}
