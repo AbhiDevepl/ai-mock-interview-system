@@ -1,0 +1,73 @@
+# Development docker-compose with hot reload support
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: interview-mongo
+    environment:
+      MONGO_INITDB_DATABASE: ai-mock-interview
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - interview-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: interview-backend
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      MONGODB_URL: mongodb://mongo:27017/ai-mock-interview
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      # Bind mount for local development with nodemon hot reload
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - interview-network
+    stdin_open: true
+    tty: true
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000
+    container_name: interview-frontend
+    env_file:
+      - .env
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    volumes:
+      # Bind mount for local development with Vite HMR
+      - ./client/src:/app/src
+      - ./client/index.html:/app/index.html
+      - ./client/public:/app/public
+    networks:
+      - interview-network
+
+volumes:
+  mongo_data:
+
+networks:
+  interview-network:
+    driver: bridge
