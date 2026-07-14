@@ -1,0 +1,43 @@
+# Caddyfile for SPA routing and static asset serving
+# Caddy is in "internal/reverse-proxied" mode: no auto TLS, explicit :80 bind
+
+:80 {
+    # Root directory for static files
+    root * /srv
+
+    # Enable gzip compression (enabled by default, explicit here for clarity)
+    encode gzip zstd
+
+    # Try files with fallback to index.html for SPA routing
+    # This ensures React Router handles all routes
+    try_files {path} {path}/ /index.html
+
+    # Serve static files
+    file_server
+
+    # Cache headers for versioned assets (long-lived)
+    @assets {
+        path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
+        # Exclude index.html from this group
+        path !*/index.html
+    }
+    header @assets Cache-Control "public, immutable, max-age=31536000"
+
+    # Cache headers for index.html (no-cache to detect new deployments)
+    @indexhtml {
+        path /index.html
+    }
+    header @indexhtml Cache-Control "no-cache, no-store, must-revalidate"
+
+    # Remove server header for security
+    header -Server
+
+    # Enable HSTS if needed (optional for internal deployments)
+    # header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    # Log all requests (optional, remove for quieter operation)
+    log {
+        output stdout
+        level info
+    }
+}

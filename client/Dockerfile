@@ -13,20 +13,21 @@ ENV VITE_API_URL=$VITE_API_URL
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve static files with nginx
-FROM nginx:alpine AS runtime
+# Stage 2: Serve static files with Caddy
+FROM caddy:2-alpine AS runtime
 
-# Copy custom nginx config for SPA routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom Caddyfile for SPA routing and compression
+COPY Caddyfile /etc/caddy/Caddyfile
 
-# Copy built dist files to nginx html directory
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy built dist files to Caddy's file root
+COPY --from=builder /app/dist /srv
 
-# Expose port 80
+# Caddy will auto-read Caddyfile on startup
 EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost/index.html || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# Start Caddy with default config
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

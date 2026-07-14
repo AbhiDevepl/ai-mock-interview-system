@@ -1,0 +1,69 @@
+# Development docker-compose configuration
+# Backend and frontend use bind mounts for hot reload
+# Mongo persists data via named volume
+
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: interview-mongo-dev
+    environment:
+      MONGO_INITDB_DATABASE: ai-mock-interview
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - interview-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: interview-backend-dev
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      MONGODB_URL: mongodb://mongo:27017/ai-mock-interview
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - interview-network
+    stdin_open: true
+    tty: true
+
+  frontend:
+    image: node:20-alpine
+    container_name: interview-frontend-dev
+    working_dir: /app
+    command: npm run dev
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: http://localhost:5000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - interview-network
+    stdin_open: true
+    tty: true
+
+volumes:
+  mongo_data:
+
+networks:
+  interview-network:
+    driver: bridge
