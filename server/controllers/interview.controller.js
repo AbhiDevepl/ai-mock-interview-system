@@ -194,10 +194,8 @@ export const generateQuestion = async (req, res) => {
       creditLeft: user.credits,
     });
   } catch (error) {
-    //console.log(error);
-    return res
-      .status(500)
-      .json({ message: `Failed to generate questions ${error}` });
+    console.error("Generate question error:", error);
+    return res.status(500).json({ message: "Failed to generate questions" });
   }
 };
 
@@ -206,6 +204,15 @@ export const submitAnswer = async (req, res) => {
     const { interviewId, questionIndex, answer, timeTaken } = req.body;
 
     const interview = await Interview.findById(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Unauthorized access." });
+    }
+
     const question = interview.questions[questionIndex];
 
     if (!answer) {
@@ -297,10 +304,15 @@ export const finishInterview = async (req, res) => {
   try {
     const { interviewId } = req.body;
     const interview = await Interview.findById(interviewId);
-   if(!interview){
-    return res.status(404).json({ message: "Interview not found" });
-   }
-   const totalQuestion=interview.questions.length;
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Unauthorized access." });
+    }
+
+    const totalQuestion = interview.questions.length;
    
    let totalScore = 0;
    let totelConfidence=0;
