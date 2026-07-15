@@ -54,7 +54,7 @@ function sanitizeUser(user) {
 
 export const googleAuth = async (req, res) => {
   try {
-    const { idToken, name, photo } = req.body;
+    const { idToken } = req.body;
 
     if (!idToken) {
       return res.status(401).json({ message: "Authentication failed." });
@@ -67,7 +67,7 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    const { email, email_verified, uid: firebaseUID } = decodedToken;
+    const { email, email_verified, uid: firebaseUID, name: firebaseName, picture: firebasePicture } = decodedToken;
 
     if (!email || !email_verified) {
       return res.status(401).json({ message: "Authentication failed." });
@@ -77,17 +77,20 @@ export const googleAuth = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name: name || email.split("@")[0],
+        name: firebaseName || email.split("@")[0],
         email,
-        picture: photo || "",
+        picture: firebasePicture || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
     } else {
-      if (photo) user.picture = photo;
+      if (!user.isActive) {
+        return res.status(403).json({ message: "This account has been deactivated." });
+      }
+      if (firebaseName) user.name = firebaseName;
+      if (firebasePicture) user.picture = firebasePicture;
       if (firebaseUID) user.firebaseUID = firebaseUID;
       user.lastLoginAt = new Date();
-      if (!user.isActive) user.isActive = true;
       await user.save();
     }
 
