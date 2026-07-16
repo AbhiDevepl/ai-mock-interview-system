@@ -1,6 +1,7 @@
 import express from "express";
 import isAuth from "../middleware/isAuth.js";
 import { upload } from "../middleware/multer.js";
+import { sessionLimiter } from "../middleware/rateLimiter.js";
 import {
   analyzeResume,
   generateQuestion,
@@ -10,9 +11,20 @@ import {
 
 const interviewRouter = express.Router();
 
-interviewRouter.post("/resume", isAuth, upload.single("resume"), analyzeResume);
-interviewRouter.post("/generate-question", isAuth, generateQuestion);
-interviewRouter.post("/submit-answer", isAuth, submitAnswer);
-interviewRouter.post("/finish", isAuth, finishInterview);
+interviewRouter.post(
+  "/resume",
+  isAuth,
+  sessionLimiter,
+  upload.single("resume"),
+  analyzeResume,
+);
+interviewRouter.post(
+  "/generate-question",
+  isAuth,
+  sessionLimiter,
+  generateQuestion,
+);
+interviewRouter.post("/submit-answer", isAuth, sessionLimiter, submitAnswer);
+interviewRouter.post("/finish", isAuth, sessionLimiter, finishInterview);
 
 export default interviewRouter;
