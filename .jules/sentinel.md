@@ -12,3 +12,8 @@
 **Vulnerability:** Expensive AI-powered endpoints (resume analysis and question generation) were not rate-limited, allowing a single user or bot to exhaust API credits and server resources.
 **Learning:** High-cost operations (AI, PDF processing) are primary targets for DoS attacks. Relying solely on credit-based limiting is insufficient if the limiting itself can be bypassed or hammered.
 **Prevention:** Implement global and endpoint-specific rate limiting (e.g., using `express-rate-limit`) to throttle requests before they hit expensive logic. Use `trust proxy` when behind a reverse proxy to ensure accurate IP-based limiting.
+
+## 2026-07-17 - [HIGH] Unrestricted Arbitrary File Upload
+**Vulnerability:** The resume upload endpoints accepted any file format (including potentially malicious scripts, executables, or HTML) and saved them to the server disk because the Multer middleware configuration lacked MIME type and extension validation.
+**Learning:** Unsanitized file uploads pose critical security risks including Remote Code Execution (RCE), Cross-Site Scripting (XSS), and storage Denial of Service (DoS). Simply depending on the downstream parsing logic to fail on invalid files is insufficient to protect server storage.
+**Prevention:** Always restrict accepted file types at the upload middleware layer using strict `fileFilter` functions checking both the MIME type and file extension, and handle the rejected file errors gracefully at the application entrypoint.
