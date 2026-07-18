@@ -1,4 +1,5 @@
 import fs from "fs";
+import mongoose from "mongoose";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { askAi } from "../services/openRouter.service.js";
 import Interview from "../models/interview.model.js";
@@ -75,14 +76,36 @@ export const analyzeResume = async (req, res) => {
 export const generateQuestion = async (req, res) => {
   try {
     const { role: rawRole, experience: rawExperience, mode: rawMode, projects, skills, resumeText } = req.body;
-    const role = rawRole?.trim();
-    const experience = rawExperience?.trim();
-    const mode = rawMode?.trim();
-    if (!role || !experience || !mode) {
-      return res
-        .status(400)
-        .json({ message: "Role, Experience and Mode are required" });
+    const role = typeof rawRole === "string" ? rawRole.trim() : "";
+    const experience = typeof rawExperience === "string" ? rawExperience.trim() : "";
+    const mode = typeof rawMode === "string" ? rawMode.trim() : "";
+
+    if (!role || role.length > 100) {
+      return res.status(400).json({ message: "Role is required and must be under 100 characters." });
     }
+    if (!experience || experience.length > 100) {
+      return res.status(400).json({ message: "Experience is required and must be under 100 characters." });
+    }
+    const allowedModes = ["Technical", "Behavioral", "System Design", "HR", "SystemDesign"];
+    if (!mode || !allowedModes.includes(mode)) {
+      return res.status(400).json({ message: "Invalid or missing interview mode." });
+    }
+
+    if (projects !== undefined && (!Array.isArray(projects) || projects.length > 15 || projects.some(p => typeof p !== "string" || p.length > 100))) {
+      return res.status(400).json({ message: "Projects must be an array of up to 15 strings (max 100 chars each)." });
+    }
+    if (skills !== undefined && (!Array.isArray(skills) || skills.length > 15 || skills.some(s => typeof s !== "string" || s.length > 100))) {
+      return res.status(400).json({ message: "Skills must be an array of up to 15 strings (max 100 chars each)." });
+    }
+    if (resumeText !== undefined && (typeof resumeText !== "string" || resumeText.length > 100000)) {
+      return res.status(400).json({ message: "Resume text must be a string under 100k characters." });
+    }
+
+    // Map mode to valid DB enum values
+    let dbMode = mode;
+    if (mode === "Behavioral") dbMode = "HR";
+    if (mode === "System Design") dbMode = "SystemDesign";
+
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -181,7 +204,7 @@ export const generateQuestion = async (req, res) => {
       })),
       role,
       experience,
-      mode,
+      mode: dbMode,
       projects,
       skills,
       resumeText: sefeResume,
@@ -203,6 +226,10 @@ export const submitAnswer = async (req, res) => {
   try {
     const { interviewId, questionIndex, answer, timeTaken } = req.body;
 
+    if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
+      return res.status(400).json({ message: "Invalid interview ID format." });
+    }
+
     const interview = await Interview.findById(interviewId);
 
     if (!interview) {
@@ -211,6 +238,24 @@ export const submitAnswer = async (req, res) => {
 
     if (interview.userId.toString() !== req.userId) {
       return res.status(403).json({ message: "Unauthorized access." });
+    }
+
+    if (
+      questionIndex === undefined ||
+      typeof questionIndex !== "number" ||
+      !Number.isInteger(questionIndex) ||
+      questionIndex < 0 ||
+      questionIndex >= interview.questions.length
+    ) {
+      return res.status(400).json({ message: "Invalid question index." });
+    }
+
+    if (timeTaken !== undefined && (typeof timeTaken !== "number" || timeTaken < 0)) {
+      return res.status(400).json({ message: "Invalid time taken." });
+    }
+
+    if (answer !== undefined && typeof answer !== "string") {
+      return res.status(400).json({ message: "Answer must be a string." });
     }
 
     const question = interview.questions[questionIndex];
@@ -303,6 +348,11 @@ export const submitAnswer = async (req, res) => {
 export const finishInterview = async (req, res) => {
   try {
     const { interviewId } = req.body;
+
+    if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
+      return res.status(400).json({ message: "Invalid interview ID format." });
+    }
+
     const interview = await Interview.findById(interviewId);
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
