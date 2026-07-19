@@ -62,4 +62,19 @@ describe('Multer File Upload and Restrictions', () => {
     expect(response.status).toBe(400);
     expect(response.body.message).toBe('File exceeds the 5MB size limit.');
   });
+
+  it('should sanitize filename and prevent path traversal', async () => {
+    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+    const response = await request(app)
+      .post('/test-upload')
+      .attach('resume', buffer, { filename: '../../traversal.pdf', contentType: 'application/pdf' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.filename).toBeDefined();
+    // Path traversal sequences should be stripped, so it should start with UUID followed by -traversal.pdf
+    expect(response.body.filename).not.toContain('..');
+    expect(response.body.filename).not.toContain('/');
+    expect(response.body.filename).not.toContain('\\');
+    expect(response.body.filename).toMatch(/^[a-f0-9-]{36}-traversal\.pdf$/i);
+  });
 });
