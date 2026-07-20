@@ -1,11 +1,11 @@
 /**
- * AuthCat — Centralized Frontend Configuration
+ * InterviewIQ_AI — Centralized Frontend Configuration
  * Single source of truth for all environment variables.
  * Everything must be prefixed with VITE_ to be exposed to client code.
  */
 const config = {
   serverUrl:
-    (import.meta.env.VITE_SERVER_URL || "http://localhost:8000").replace(
+    (import.meta.env.VITE_SERVER_URL).replace(
       /\/+$/,
       "",
     ),

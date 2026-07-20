@@ -1,6 +1,6 @@
 import React from "react";
-import maleVideo from "../assets/Videos/male-ai.mp4"
-import femaleVideo from "../assets/Videos/female-ai.mp4"
+import maleVideo from "../assets/Videos/male-ai.mp4?url"
+import femaleVideo from "../assets/Videos/female-ai.mp4?url"
 import Timer from "./Timer.jsx"
 
 function Step2Interview({ interviewData, onFinish }) {
