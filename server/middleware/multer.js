@@ -1,12 +1,15 @@
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
+import path from "path";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "public")
   },
   filename: function (req, file, cb) {
-    const filename = uuidv4() + "-" + file.originalname;
+    // Extract base filename to prevent path traversal vulnerability (e.g. ../../traversal.pdf)
+    const safeOriginalName = path.basename(file.originalname);
+    const filename = uuidv4() + "-" + safeOriginalName;
     cb(null, filename)
   }
 })
