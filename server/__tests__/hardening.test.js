@@ -28,10 +28,15 @@ jest.unstable_mockModule('../config/token.js', () => ({
 
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = req.headers.userid;
+  next();
+}, getCurrentUser);
 
 let mongoServer;
 
@@ -101,5 +106,46 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('getCurrentUser Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should reject deactivated users with 401', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user')
+      .set('userid', user._id.toString());
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+    expect(response.headers['set-cookie']).toBeDefined(); // should clear token cookie
+  });
+
+  it('should allow active users and return user profile excluding sensitive fields', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+      firebaseUID: 'fuid_123',
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user')
+      .set('userid', user._id.toString());
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+    expect(response.body.email).toBe('active@example.com');
+    expect(response.body.firebaseUID).toBeUndefined();
+    expect(response.body.isActive).toBeUndefined();
   });
 });
