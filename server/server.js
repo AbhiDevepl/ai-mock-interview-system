@@ -8,6 +8,7 @@ import authRouter from "./routers/auth.route.js";
 import userRouter from "./routers/user.route.js";
 import interviewRouter from "./routers/interview.route.js";
 import resumeRouter from "./routers/resume.route.js";
+import healthRouter from "./routers/health.route.js";
 dotenv.config();
 
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/interview", interviewRouter);
 app.use("/api/resume", resumeRouter);
+app.use("/api", healthRouter);
 
 app.use((err, req, res, next) => {
   if (err.message === "Only PDF files are allowed") {
