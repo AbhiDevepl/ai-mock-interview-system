@@ -19,6 +19,34 @@ function NavBar() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
+  const creditsRef = React.useRef(null);
+  const userMenuRef = React.useRef(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event) {
+      if (creditsRef.current && !creditsRef.current.contains(event.target)) {
+        setShowCreditsPopup(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserPopup(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setShowCreditsPopup(false);
+        setShowUserPopup(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   const handleLogout = async () => {
     try {
       await axios.post(ServerUrl + "/api/auth/logout", {}, { withCredentials: true });
@@ -50,7 +78,7 @@ function NavBar() {
         </div>
 
         <div className="flex items-center gap-6 relative">
-          <div className="relative">
+          <div className="relative" ref={creditsRef}>
             <button
               onClick={() => {
                 if (!userData) {
@@ -60,7 +88,10 @@ function NavBar() {
                 setShowCreditsPopup(!showCreditsPopup);
                 setShowUserPopup(false);
               }}
-              className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full text-md hover:bg-gray-200 transition"
+              aria-label={userData ? `Credits: ${userData?.credits || 0}. Click to view details.` : "Sign in to view credits"}
+              aria-expanded={showCreditsPopup}
+              aria-haspopup="true"
+              className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full text-md hover:bg-gray-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             >
               <BsCoin size={20} />
               {userData?.credits || 0}
@@ -81,7 +112,7 @@ function NavBar() {
             )}
           </div>
 
-          <div className="relative">
+          <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => {
                 if (!userData) {
@@ -91,8 +122,11 @@ function NavBar() {
                 setShowUserPopup(!showUserPopup);
                 setShowCreditsPopup(false);
               }}
+              aria-label={userData ? `User menu for ${userData?.name || "anonymous"}` : "Sign in"}
+              aria-expanded={showUserPopup}
+              aria-haspopup="true"
               className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden
-              font-semibold"
+              font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
             >
               {userData?.picture ? (
                 <img src={userData.picture} alt="Profile" className="w-full h-full object-cover" />

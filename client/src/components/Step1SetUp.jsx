@@ -42,6 +42,17 @@ function Step1SetUp({ onStart }) {
     setAnalysisError("");
   };
 
+  React.useEffect(() => {
+    if (!isUploadOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        closeUploadModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isUploadOpen]);
+
   const validate = () => {
     const newErrors = {};
     if (!role.trim()) newErrors.role = "Role is required";
