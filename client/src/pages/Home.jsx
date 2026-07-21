@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import {
   BsRobot,
   BsMic,

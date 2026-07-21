@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { selectUser, setUserData } from "../redux/userSlice";
 import { FaUserAstronaut } from "react-icons/fa";
 import { BsRobot, BsCoin } from "react-icons/bs";

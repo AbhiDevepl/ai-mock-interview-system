@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import {
   FaUserTie,
   FaBriefcase,
@@ -199,12 +199,13 @@ function Step1SetUp({ onStart }) {
 
           <div className="space-y-5">
             <div className="relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="target-role" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Target Role <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <FaBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
                 <input
+                  id="target-role"
                   type="text"
                   placeholder="e.g., Frontend Developer, DevOps Engineer"
                   value={role}
@@ -215,17 +216,18 @@ function Step1SetUp({ onStart }) {
                 />
               </div>
               {errors.role && (
-                <p className="mt-1.5 text-sm text-red-500">{errors.role}</p>
+                <p className="mt-1.5 text-sm text-red-500" role="alert">{errors.role}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="experience-level" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Experience Level <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <FaBriefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg" />
                 <input
+                  id="experience-level"
                   type="text"
                   placeholder="e.g., 3 years, Senior, Mid-level"
                   value={experience}
@@ -238,21 +240,23 @@ function Step1SetUp({ onStart }) {
                 />
               </div>
               {errors.experience && (
-                <p className="mt-1.5 text-sm text-red-500">{errors.experience}</p>
+                <p className="mt-1.5 text-sm text-red-500" role="alert">{errors.experience}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <span className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Interview Mode <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-3 gap-3">
+              </span>
+              <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Interview Mode">
                 {MODES.map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     onClick={() => setMode(m.id)}
-                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 ${mode === m.id
+                    role="radio"
+                    aria-checked={mode === m.id}
+                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500 ${mode === m.id
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
                         : "border-gray-200 hover:border-emerald-300 text-gray-600"
                       }`}
@@ -265,13 +269,14 @@ function Step1SetUp({ onStart }) {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label htmlFor="resume-upload-trigger" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Resume
               </label>
               <button
+                id="resume-upload-trigger"
                 type="button"
                 onClick={() => setIsUploadOpen(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60"
+                className="w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
                   <FaFileUpload className="text-emerald-600" />
@@ -348,17 +353,21 @@ function Step1SetUp({ onStart }) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.25 }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upload-resume-title"
             className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
           >
             <button
               type="button"
               onClick={closeUploadModal}
-              className="absolute top-4 right-4 text-gray-500 hover:text-black transition-colors cursor-pointer"
+              aria-label="Close upload modal"
+              className="absolute top-4 right-4 text-gray-500 hover:text-black transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-full p-1"
             >
               <FaTimes size={18} />
             </button>
 
-            <h3 className="text-lg font-bold tracking-tight text-gray-900">
+            <h3 id="upload-resume-title" className="text-lg font-bold tracking-tight text-gray-900">
               Upload Resume
             </h3>
             <p className="mt-1 text-sm text-gray-500">
