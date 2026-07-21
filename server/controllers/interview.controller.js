@@ -258,6 +258,10 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Answer must be a string." });
     }
 
+    if (answer !== undefined && answer.length > 5000) {
+      return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
+    }
+
     const question = interview.questions[questionIndex];
 
     if (!answer) {

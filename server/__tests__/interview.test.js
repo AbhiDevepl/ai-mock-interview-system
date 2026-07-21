@@ -172,6 +172,27 @@ describe('Interview Controller Hardening & Validation', () => {
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('Answer must be a string.');
     });
+
+    it('should reject extremely long answer (over 5000 characters) to prevent DoS', async () => {
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
+      });
+
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .send({
+          interviewId: interview._id,
+          questionIndex: 0,
+          answer: 'a'.repeat(5001),
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.message).toBe('Answer must be a string under 5000 characters.');
+    });
   });
 
   describe('POST /api/interview/finish', () => {
