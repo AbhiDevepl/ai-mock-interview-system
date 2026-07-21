@@ -49,6 +49,9 @@ function sanitizeUser(user) {
   for (const field of USER_DATA_FIELDS) {
     data[field] = user[field];
   }
+  if (user && user._id) {
+    data.id = user._id.toString();
+  }
   return data;
 }
 
@@ -117,7 +120,10 @@ export const logOut = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     const { userId } = req;
-    const user = await User.findById(userId);
+    // Optimize performance by selecting only specific fields and using .lean()
+    const user = await User.findById(userId)
+      .select('_id name email picture credits role lastLoginAt createdAt isActive')
+      .lean();
 
     if (!user || !user.isActive) {
       res.clearCookie("token", COOKIE_OPTIONS);
@@ -148,7 +154,10 @@ export const refreshAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication required." });
     }
 
-    const user = await User.findById(decoded.userId);
+    // Optimize performance by selecting only specific fields and using .lean()
+    const user = await User.findById(decoded.userId)
+      .select('_id name email picture credits role lastLoginAt createdAt isActive')
+      .lean();
     if (!user || !user.isActive) {
       return res.status(401).json({ message: "Authentication required." });
     }
