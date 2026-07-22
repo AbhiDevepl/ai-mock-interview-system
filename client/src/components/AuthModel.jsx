@@ -14,6 +14,16 @@ function AuthModel({ onClose }) {
     }
   }, [userData, onClose]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -29,6 +39,7 @@ function AuthModel({ onClose }) {
         <button
           type="button"
           onClick={onClose}
+          aria-label="Close authentication modal"
           className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-black cursor-pointer"
         >
           <FaTimes size={18} />
