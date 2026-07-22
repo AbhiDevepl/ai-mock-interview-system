@@ -392,7 +392,22 @@ function Step1SetUp({ onStart }) {
                   ? undefined
                   : () => document.getElementById("resumeUpload")?.click()
               }
-              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
+              onKeyDown={(e) => {
+                if (analysisStatus !== "success" && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  document.getElementById("resumeUpload")?.click();
+                }
+              }}
+              role={analysisStatus === "success" ? undefined : "button"}
+              tabIndex={analysisStatus === "success" ? undefined : 0}
+              aria-label={
+                analysisStatus === "success"
+                  ? "Resume analyzed successfully"
+                  : resumeFile
+                  ? `Selected resume file: ${resumeFile.name}. Click or press Enter to change.`
+                  : "Click or press Enter to upload PDF resume"
+              }
+              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 analysisStatus === "success"
                   ? "border-emerald-300 bg-emerald-50/60"
                   : "border-gray-300 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60"
