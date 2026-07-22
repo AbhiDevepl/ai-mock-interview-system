@@ -145,7 +145,8 @@ export const refreshAuth = async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+      // Hardened: Specify the expected signature algorithm HS256 to prevent key confusion attacks
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET, { algorithms: ["HS256"] });
     } catch {
       return res.status(401).json({ message: "Authentication required." });
     }

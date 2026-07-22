@@ -27,7 +27,8 @@ export function genRefreshToken(userId, role = "user") {
 
 export function verifyToken(token) {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Hardened: Specify the expected signature algorithm HS256 to prevent key confusion attacks
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
     return { valid: true, decoded };
   } catch (error) {
     if (error.name === "TokenExpiredError")
