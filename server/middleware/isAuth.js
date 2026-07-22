@@ -10,7 +10,8 @@ const isAuth = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Hardened: Specify the expected signature algorithm HS256 to prevent key confusion attacks
+      decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
     } catch {
       return res.status(401).json({ message: "Unauthorized access." });
     }
@@ -35,7 +36,8 @@ export const optionalAuth = async (req, res, next) => {
   const token = req.cookies?.token;
   if (token) {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Hardened: Specify the expected signature algorithm HS256 to prevent key confusion attacks
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
       if (!decoded.type || decoded.type === "access") {
         req.userId = decoded.userId;
         req.userRole = decoded.role;
