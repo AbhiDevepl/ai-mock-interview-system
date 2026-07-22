@@ -17,14 +17,18 @@ export const analyzeResume = async (req, res) => {
     const uint8Array = new Uint8Array(fileBuffer);
     const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
 
-    let resumeText = "";
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      const pageText = content.items.map((item) => item.str).join(" ");
-      resumeText += pageText + "\n";
-    }
-    resumeText = resumeText.replace(/\s+/g, " ").trim();
+    // PERFORMANCE OPTIMIZATION: Parse PDF pages in parallel instead of sequentially.
+    // This reduces processing latency significantly for multi-page resumes.
+    const pagePromises = Array.from({ length: pdf.numPages }, (_, i) => {
+      const pageNum = i + 1;
+      return pdf.getPage(pageNum).then(async (page) => {
+        const content = await page.getTextContent();
+        return content.items.map((item) => item.str).join(" ");
+      });
+    });
+
+    const pagesTexts = await Promise.all(pagePromises);
+    let resumeText = pagesTexts.join("\n").replace(/\s+/g, " ").trim();
 
     if (!resumeText) {
       fs.unlinkSync(filepath);
@@ -106,7 +110,9 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    const user = await User.findById(req.userId);
+    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
+    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -230,7 +236,9 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    const interview = await Interview.findById(interviewId);
+    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
+    // as it is not needed here, saving network bandwidth and memory overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText");
 
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
@@ -357,7 +365,9 @@ export const finishInterview = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    const interview = await Interview.findById(interviewId);
+    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
+    // as it is not needed here, saving network bandwidth and memory overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText");
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
