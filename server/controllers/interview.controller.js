@@ -111,8 +111,8 @@ export const generateQuestion = async (req, res) => {
     if (mode === "System Design") dbMode = "SystemDesign";
 
     // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
-    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits");
+    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits").lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -198,8 +198,20 @@ export const generateQuestion = async (req, res) => {
     if (questionsArray.length === 0) {
       return res.status(500).json({ message: "Failed to generate questions" });
     }
-    user.credits -= 50;
-    await user.save();
+
+    // PERFORMANCE OPTIMIZATION: Perform an atomic credit update on the plain DB document to prevent
+    // race conditions, avoid document save/hooks overhead, and use .lean() to bypass hydration.
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.userId, credits: { $gte: 50 } },
+      { $inc: { credits: -50 } },
+      { new: true, select: "credits" }
+    ).lean();
+
+    if (!updatedUser) {
+      return res
+        .status(400)
+        .json({ message: "Not enough credits. Minimum 50 required" });
+    }
 
     const interview = await Interview.create({
       userId: user._id,
@@ -220,7 +232,7 @@ export const generateQuestion = async (req, res) => {
       interviewId: interview._id,
       questions: interview.questions,
       userName: user.name,
-      creditLeft: user.credits,
+      creditLeft: updatedUser.credits,
     });
   } catch (error) {
     console.error("Generate question error:", error);
