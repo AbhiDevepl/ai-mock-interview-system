@@ -26,12 +26,17 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
-// NOW IMPORT CONTROLLER
+// NOW IMPORT CONTROLLERS
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = '660000000000000000000002';
+  next();
+}, getCurrentUser);
 
 let mongoServer;
 
@@ -101,5 +106,50 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('getCurrentUser Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    jest.clearAllMocks();
+  });
+
+  it('should return 200 and sanitized user details for active users', async () => {
+    await User.create({
+      _id: '660000000000000000000002',
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+    expect(response.body.id).toBe('660000000000000000000002');
+    expect(response.body.isActive).toBeUndefined();
+    expect(response.body.firebaseUID).toBeUndefined();
+  });
+
+  it('should reject deactivated users and clear token cookie', async () => {
+    await User.create({
+      _id: '660000000000000000000002',
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Verify cookie deletion in response headers
+    const setCookie = response.headers['set-cookie'];
+    expect(setCookie).toBeDefined();
+    expect(setCookie[0]).toContain('token=;');
   });
 });
