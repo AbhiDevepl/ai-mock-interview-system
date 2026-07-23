@@ -283,23 +283,39 @@ function Step1SetUp({ onStart }) {
               <label htmlFor="resume-upload-trigger" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Resume
               </label>
-              <button
-                id="resume-upload-trigger"
-                type="button"
-                onClick={() => setIsUploadOpen(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                  <FaFileUpload className="text-emerald-600" />
-                </span>
-                <span
-                  className={`truncate font-medium ${
-                    resumeFile ? "text-gray-800" : "text-gray-500"
-                  }`}
+              <div className="flex gap-2">
+                <button
+                  id="resume-upload-trigger"
+                  type="button"
+                  onClick={() => setIsUploadOpen(true)}
+                  className="flex-1 flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
                 >
-                  {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
-                </span>
-              </button>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                    <FaFileUpload className="text-emerald-600" />
+                  </span>
+                  <span
+                    className={`truncate font-medium ${
+                      resumeFile ? "text-gray-800" : "text-gray-500"
+                    }`}
+                  >
+                    {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
+                  </span>
+                </button>
+                {resumeFile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResumeFile(null);
+                      setAnalysisResult(null);
+                      setAnalysisStatus(null);
+                    }}
+                    aria-label="Remove uploaded resume"
+                    className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20 focus-visible:border-red-500 cursor-pointer"
+                  >
+                    <FaTimes size={18} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           {analysisStatus === "success" && analysisResult && (
