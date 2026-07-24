@@ -13,6 +13,14 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
+    const user = await User.findById(req.userId).select("isActive").lean();
+    if (!user || user.isActive === false) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
+
     const fileBuffer = await fs.promises.readFile(filepath);
     const uint8Array = new Uint8Array(fileBuffer);
     const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
@@ -110,11 +118,14 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
+    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits, isActive)
     // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits");
+    const user = await User.findById(req.userId).select("_id name email credits isActive");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+    if (user.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
     }
     if (user.credits < 50) {
       return res
