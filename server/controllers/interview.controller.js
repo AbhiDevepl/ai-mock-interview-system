@@ -110,13 +110,14 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
-    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits");
-    if (!user) {
+    // PERFORMANCE OPTIMIZATION: Check credits using a very fast, read-only lean query
+    // before calling the expensive AI service. This avoids fetching and hydrating unused fields,
+    // saving database bandwidth and server memory, and avoids AI calls for users with insufficient credits.
+    const userPreCheck = await User.findById(req.userId).select("credits").lean();
+    if (!userPreCheck) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (user.credits < 50) {
+    if (userPreCheck.credits < 50) {
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
@@ -198,8 +199,25 @@ export const generateQuestion = async (req, res) => {
     if (questionsArray.length === 0) {
       return res.status(500).json({ message: "Failed to generate questions" });
     }
-    user.credits -= 50;
-    await user.save();
+
+    // PERFORMANCE OPTIMIZATION: State-changing DB operation (credit deduction) performed atomically.
+    // Uses findOneAndUpdate with $inc and .lean() to prevent concurrent update race conditions (double-spending)
+    // and completely bypass Mongoose model hydration and save/validation hooks overhead.
+    const user = await User.findOneAndUpdate(
+      { _id: req.userId, credits: { $gte: 50 } },
+      { $inc: { credits: -50 } },
+      { new: true, select: "_id name email credits", lean: true }
+    );
+
+    if (!user) {
+      const userExists = await User.findById(req.userId).select("_id").lean();
+      if (!userExists) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      return res
+        .status(400)
+        .json({ message: "Not enough credits. Minimum 50 required" });
+    }
 
     const interview = await Interview.create({
       userId: user._id,
