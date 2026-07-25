@@ -26,12 +26,33 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
-// NOW IMPORT CONTROLLER
+// NOW IMPORT CONTROLLERS
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+
+// Mock isAuth user binding for current-user and interview endpoints
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  next();
+}, getCurrentUser);
+
+app.post('/api/interview/generate-question', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  next();
+}, generateQuestion);
+
+app.post('/api/interview/resume', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  next();
+}, (req, res, next) => {
+  req.file = { path: 'non-existent-test-resume.pdf' };
+  next();
+}, analyzeResume);
 
 let mongoServer;
 
@@ -101,5 +122,89 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('getCurrentUser Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should allow active users to fetch profile', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+    expect(response.body).not.toHaveProperty('isActive');
+    expect(response.body).not.toHaveProperty('firebaseUID');
+  });
+
+  it('should reject deactivated users and clear session cookies', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Verify session cookies are cleared
+    const cookies = response.headers['set-cookie'];
+    expect(cookies).toBeDefined();
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+  });
+});
+
+describe('AI endpoints account deactivation protection', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should reject deactivated users from generating questions', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .send({
+        role: 'Frontend Developer',
+        experience: '3 years',
+        mode: 'Technical',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users from analyzing resumes and handle cleanup', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/resume');
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
   });
 });
