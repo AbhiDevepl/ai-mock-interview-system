@@ -111,8 +111,8 @@ export const generateQuestion = async (req, res) => {
     if (mode === "System Design") dbMode = "SystemDesign";
 
     // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
-    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits");
+    // and use `.lean()` to avoid fetching, hydrating, and tracking unused fields.
+    const user = await User.findById(req.userId).select("_id name email credits").lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -198,11 +198,22 @@ export const generateQuestion = async (req, res) => {
     if (questionsArray.length === 0) {
       return res.status(500).json({ message: "Failed to generate questions" });
     }
-    user.credits -= 50;
-    await user.save();
+    // PERFORMANCE OPTIMIZATION: Deduct credits atomically only if the user has >= 50 credits.
+    // This prevents concurrent double-spending race conditions and avoids Mongoose document hydration.
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: req.userId, credits: { $gte: 50 } },
+      { $inc: { credits: -50 } },
+      { new: true, select: "_id name email credits" }
+    ).lean();
+
+    if (!updatedUser) {
+      return res
+        .status(400)
+        .json({ message: "Not enough credits. Minimum 50 required" });
+    }
 
     const interview = await Interview.create({
-      userId: user._id,
+      userId: updatedUser._id,
       questions: questionsArray.map((q, index) => ({
         question: q,
         difficulty: ["easy", "easy", "medium", "medium", "hard"][index],
@@ -219,8 +230,8 @@ export const generateQuestion = async (req, res) => {
     res.json({
       interviewId: interview._id,
       questions: interview.questions,
-      userName: user.name,
-      creditLeft: user.credits,
+      userName: updatedUser.name,
+      creditLeft: updatedUser.credits,
     });
   } catch (error) {
     console.error("Generate question error:", error);
