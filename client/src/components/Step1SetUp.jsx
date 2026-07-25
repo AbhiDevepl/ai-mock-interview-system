@@ -343,9 +343,19 @@ function Step1SetUp({ onStart }) {
               disabled={!role || !experience || loading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              className="w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-base shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition"
+              className="w-full px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-base shadow-lg shadow-emerald-600/25 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
             >
-              {loading? "Processing..." : "Start Interview"}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Processing...
+                </>
+              ) : (
+                "Start Interview"
+              )}
             </motion.button>
             <p className="mt-3 text-center text-xs text-gray-500">
               Your session is private and secured.
@@ -392,7 +402,20 @@ function Step1SetUp({ onStart }) {
                   ? undefined
                   : () => document.getElementById("resumeUpload")?.click()
               }
-              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
+              onKeyDown={
+                analysisStatus === "success"
+                  ? undefined
+                  : (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        document.getElementById("resumeUpload")?.click();
+                      }
+                    }
+              }
+              tabIndex={analysisStatus === "success" ? -1 : 0}
+              role={analysisStatus === "success" ? undefined : "button"}
+              aria-label={analysisStatus === "success" ? "Resume analyzed successfully" : "Upload resume (Optional)"}
+              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 analysisStatus === "success"
                   ? "border-emerald-300 bg-emerald-50/60"
                   : "border-gray-300 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60"
@@ -437,9 +460,19 @@ function Step1SetUp({ onStart }) {
                         handleUploadResume();
                       }}
                       disabled={analyzing}
-                      className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 mx-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                     >
-                      {analyzing ? "Analyzing..." : "Analyze Resume"}
+                      {analyzing ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Analyzing...
+                        </>
+                      ) : (
+                        "Analyze Resume"
+                      )}
                     </motion.button>
                   )}
                 </>
