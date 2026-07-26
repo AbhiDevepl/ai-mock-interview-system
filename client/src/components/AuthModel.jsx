@@ -40,7 +40,7 @@ function AuthModel({ onClose }) {
           type="button"
           onClick={onClose}
           aria-label="Close authentication modal"
-          className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-black cursor-pointer"
+          className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-black cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
         >
           <FaTimes size={18} />
         </button>
