@@ -11,3 +11,7 @@
 ## 2026-07-23 - Atomic Credit/Balance Updates to Prevent Race Conditions and Bypass Mongoose Hydration
 **Learning:** Performing a non-atomic credit deduction like `user.credits -= 50; await user.save()` not only introduces Mongoose document hydration and validation hook overhead, but also introduces critical concurrency race conditions (e.g. double-spending credits). Replacing this sequence with an atomic `findOneAndUpdate` query using `$inc` and `.lean()` completely guarantees security against double-spends and speeds up execution by avoiding hydrated save/validation hooks.
 **Action:** For all state-changing or balance/credit operations, prefer atomic Mongoose operations combined with `.lean()` to ensure race-condition safety and high database throughput.
+
+## 2026-07-24 - MongoDB Memory Server Version Conflict and SIGSEGV Resolution
+**Learning:** The default version of `mongodb-memory-server` downloads MongoDB `8.2.6` binaries, which experience a segmentation fault (SIGSEGV) in certain Docker/Sandbox environments due to missing AVX instruction support or other low-level OS incompatibilities. Using version `6.0.16` instead completely resolves this issue and allows the unit and integration tests to run cleanly.
+**Action:** For all test environments showing MongoDB binary SIGSEGV, set `MONGOMS_VERSION=6.0.16` explicitly during execution to bypass binary incompatibilities.
