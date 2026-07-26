@@ -46,6 +46,11 @@ const interviewSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Performance Optimization: Indexes for highly efficient lookup and sorting of interview records.
+// Compounding userId and createdAt eliminates MongoDB in-memory sort stage and turns query from O(N) to O(log N).
+interviewSchema.index({ userId: 1, createdAt: -1 });
+interviewSchema.index({ createdAt: -1 });
+
 const Interview = mongoose.model("Interview", interviewSchema);
 
 export default Interview;
