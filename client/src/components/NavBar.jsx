@@ -104,7 +104,7 @@ function NavBar() {
                 </p>
                 <button
                   onClick={() => navigate("/pricing")}
-                  className="w-full bg-black text-white py-2 rounded-lg text-sm"
+                  className="w-full bg-black text-white py-2 rounded-lg text-sm hover:bg-gray-800 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
                 >
                   Buy More Credits
                 </button>
@@ -144,13 +144,13 @@ function NavBar() {
                 </p>
                 <button
                   onClick={() => navigate("/history")}
-                  className="w-full text-left text-sm py-2 hover:text-blue-500 text-gray-600"
+                  className="w-full text-left text-sm py-2 px-2.5 rounded-lg text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                 >
                   Interview History
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left text-sm py-2 flex items-center gap-2 text-red-500 hover:text-red-600"
+                  className="w-full text-left text-sm py-2 px-2.5 flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50/50 rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 mt-1"
                 >
                   <HiOutlineLogout size={16} />
                   Logout
