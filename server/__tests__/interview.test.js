@@ -193,6 +193,52 @@ describe('Interview Controller Hardening & Validation', () => {
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('Answer must be a string under 5000 characters.');
     });
+
+    it('should successfully submit and securely sanitize and parse the AI response', async () => {
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
+      });
+
+      // Mock LLM returning Markdown-wrapped JSON with potentially unsafe values (out of bounds, HTML tags)
+      mockAskAi.mockResolvedValue(`
+        \`\`\`json
+        {
+          "confidence": "12",
+          "communication": -2,
+          "correctness": 8.5,
+          "finalScore": "9",
+          "feedback": "<script>alert('xss')</script>Good try!"
+        }
+        \`\`\`
+      `);
+
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .send({
+          interviewId: interview._id,
+          questionIndex: 0,
+          answer: 'Valid answer',
+          timeTaken: 10,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('feedback');
+      expect(response.body).toHaveProperty('score');
+
+      // Check database state to confirm validation, clamping, and sanitization were correctly performed
+      const savedInterview = await Interview.findById(interview._id);
+      const q = savedInterview.questions[0];
+      expect(q.confidence).toBe(10); // Clamped 12 -> 10
+      expect(q.communication).toBe(0); // Clamped -2 -> 0
+      expect(q.correctness).toBe(9); // Rounded 8.5 -> 9
+      expect(q.score).toBe(9); // Correct score parsed as number
+      expect(q.feedback).not.toContain('<script>'); // Stripped < and > tags
+      expect(q.feedback).toContain('alert(\'xss\')'); // Safe raw text remaining
+    });
   });
 
   describe('POST /api/interview/finish', () => {

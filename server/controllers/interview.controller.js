@@ -354,13 +354,39 @@ export const submitAnswer = async (req, res) => {
       },
     ];
     const aiResponse = await askAi(message);
-    const parsedResponse = JSON.parse(aiResponse);
-    question.confidence = parsedResponse.confidence;
-    question.communication = parsedResponse.communication;
-    question.correctness = parsedResponse.correctness;
-    question.score = parsedResponse.finalScore;
-    question.feedback = parsedResponse.feedback;
-    
+    let parsedResponse;
+    try {
+      // Clean possible Markdown JSON code block fences
+      const cleaned = aiResponse
+        .replace(/^\s*```(?:json)?\s*/i, "")
+        .replace(/\s*```\s*$/i, "")
+        .trim();
+      parsedResponse = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("AI Evaluation JSON parse error:", parseErr, "Response was:", aiResponse);
+      return res.status(500).json({ message: "Failed to parse evaluation from AI." });
+    }
+
+    if (!parsedResponse || typeof parsedResponse !== "object") {
+      return res.status(500).json({ message: "Invalid evaluation response from AI." });
+    }
+
+    // Securely validate and clamp scores to ensure they are safe numbers within 0-10
+    const sanitizeScore = (val) => {
+      const num = Number(val);
+      if (isNaN(num)) return 0;
+      return Math.max(0, Math.min(10, Math.round(num)));
+    };
+
+    question.confidence = sanitizeScore(parsedResponse.confidence);
+    question.communication = sanitizeScore(parsedResponse.communication);
+    question.correctness = sanitizeScore(parsedResponse.correctness);
+    question.score = sanitizeScore(parsedResponse.finalScore);
+
+    // Sanitize feedback to prevent stored XSS attacks and limit to 500 characters
+    const rawFeedback = typeof parsedResponse.feedback === "string" ? parsedResponse.feedback : "";
+    question.feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
+
     await interview.save();
     return res.status(200).json({ feedback: question.feedback, score: question.score });
   } catch (err) {
