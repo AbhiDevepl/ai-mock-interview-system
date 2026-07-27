@@ -252,5 +252,51 @@ describe('Interview Controller Hardening & Validation', () => {
       expect(response.status).toBe(400);
       expect(response.body.message).toBe('Invalid interview ID format.');
     });
+
+    it('should successfully finish the interview and calculate the scores', async () => {
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [
+          {
+            question: 'Q1',
+            difficulty: 'easy',
+            timeLimit: 60,
+            score: 8,
+            confidence: 9,
+            communication: 7,
+            correctness: 8,
+          },
+          {
+            question: 'Q2',
+            difficulty: 'medium',
+            timeLimit: 90,
+            score: 6,
+            confidence: 7,
+            communication: 5,
+            correctness: 6,
+          },
+        ],
+      });
+
+      const response = await request(app)
+        .post('/api/interview/finish')
+        .send({
+          interviewId: interview._id,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.finalScore).toBe('7.0');
+      expect(response.body.confidence).toBe('8.0');
+      expect(response.body.communication).toBe('6.0');
+      expect(response.body.correctness).toBe('7.0');
+      expect(response.body.questionWiseScore).toHaveLength(2);
+
+      const updated = await Interview.findById(interview._id).lean();
+      expect(updated.status).toBe('completed');
+      expect(updated.finalScore).toBe(7);
+    });
   });
 });
