@@ -121,6 +121,7 @@ export const generateQuestion = async (req, res) => {
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
     }
+
     const projectText =
       Array.isArray(projects) && projects.length ? projects.join(",") : "None";
     const skillText =
@@ -403,9 +404,9 @@ export const finishInterview = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // as it is not needed here, saving network bandwidth and memory overhead.
-    const interview = await Interview.findById(interviewId).select("-resumeText");
+    // PERFORMANCE OPTIMIZATION: Retrieve only the required 'userId' and 'questions' fields as a plain,
+    // lean object. This completely bypasses Mongoose model hydration, subdocument instantiation, and memory overhead.
+    const interview = await Interview.findById(interviewId).select("userId questions").lean();
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
@@ -441,9 +442,13 @@ export const finishInterview = async (req, res) => {
         ? totelCorrectness / totalQuestion
         : 0;
         
-    interview.finalScore = finalScore;
-    interview.status = "completed";
-    await interview.save();
+    // PERFORMANCE OPTIMIZATION: Perform a direct update via updateOne to write only modified fields.
+    // This avoids fully serializing, validating, and saving the entire heavy document back to the DB.
+    await Interview.updateOne(
+      { _id: interviewId },
+      { $set: { finalScore, status: "completed" } }
+    );
+
     return res.status(200).json({ 
       finalScore: Number(finalScore).toFixed(1),
       confidence: Number(avgConfidence).toFixed(1),

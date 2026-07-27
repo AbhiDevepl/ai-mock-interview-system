@@ -15,3 +15,7 @@
 ## 2026-07-24 - MongoDB Memory Server Version Conflict and SIGSEGV Resolution
 **Learning:** The default version of `mongodb-memory-server` downloads MongoDB `8.2.6` binaries, which experience a segmentation fault (SIGSEGV) in certain Docker/Sandbox environments due to missing AVX instruction support or other low-level OS incompatibilities. Using version `6.0.16` instead completely resolves this issue and allows the unit and integration tests to run cleanly.
 **Action:** For all test environments showing MongoDB binary SIGSEGV, set `MONGOMS_VERSION=6.0.16` explicitly during execution to bypass binary incompatibilities.
+
+## 2026-07-25 - Safe Transaction Ordering and High-Performance UpdateOne Workflows
+**Learning:** For operations combining slow external API calls (e.g. AI/LLM generation) and transactional debiting (e.g. user credits), always run the API call successfully *before* executing the database debit to prevent users from being charged for failed requests. Additionally, when updating document status fields based on values calculated across nested arrays (like in `finishInterview`), database performance can be optimized by fetching only the necessary fields with `.select().lean()` to completely bypass model hydration, and then persisting updates atomically via `updateOne` to skip full serialization and document validation overhead.
+**Action:** Always maintain correct transaction ordering to ensure reliability, and use targeted `.select().lean()` queries paired with `updateOne` for heavy document status transitions in Mongoose.
