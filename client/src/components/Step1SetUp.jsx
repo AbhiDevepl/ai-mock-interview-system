@@ -42,15 +42,59 @@ function Step1SetUp({ onStart }) {
     setAnalysisError("");
   };
 
+  const modalRef = React.useRef(null);
+  const previousFocusRef = React.useRef(null);
+
   React.useEffect(() => {
     if (!isUploadOpen) return;
+    previousFocusRef.current = document.activeElement;
+
+    setTimeout(() => {
+      if (modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length > 0) {
+          focusables[0].focus();
+        }
+      }
+    }, 50);
+
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         closeUploadModal();
+        return;
+      }
+      if (e.key === "Tab" && modalRef.current) {
+        const focusables = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus();
+            e.preventDefault();
+          }
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+      }
+    };
   }, [isUploadOpen]);
 
   const validate = () => {
@@ -386,6 +430,7 @@ function Step1SetUp({ onStart }) {
           onClick={closeUploadModal}
         >
           <motion.div
+            ref={modalRef}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.25 }}
