@@ -249,24 +249,11 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // as it is not needed here, saving network bandwidth and memory overhead.
-    const interview = await Interview.findById(interviewId).select("-resumeText");
-
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
-
-    if (interview.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized access." });
-    }
-
     if (
       questionIndex === undefined ||
       typeof questionIndex !== "number" ||
       !Number.isInteger(questionIndex) ||
-      questionIndex < 0 ||
-      questionIndex >= interview.questions.length
+      questionIndex < 0
     ) {
       return res.status(400).json({ message: "Invalid question index." });
     }
@@ -283,24 +270,53 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
     }
 
+    // PERFORMANCE OPTIMIZATION: Use .select("userId questions").lean() to bypass document hydration,
+    // saving considerable CPU/memory. Exclude heavy fields like 'resumeText' (which can be up to 100KB).
+    const interview = await Interview.findById(interviewId).select("userId questions").lean();
+
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Unauthorized access." });
+    }
+
+    if (questionIndex >= interview.questions.length) {
+      return res.status(400).json({ message: "Invalid question index." });
+    }
+
     const question = interview.questions[questionIndex];
 
     if (!answer) {
-      question.score = 0;
-      question.feedback = "No answer provided";
-      question.answer = "";
-
-      await interview.save();
-      return res.json({ feedback: question.feedback, score: 0 });
+      // PERFORMANCE OPTIMIZATION: Perform a direct atomic update using updateOne
+      // instead of hydrated .save(), saving document overhead and bypassing change-tracking.
+      await Interview.updateOne(
+        { _id: interviewId },
+        {
+          $set: {
+            [`questions.${questionIndex}.score`]: 0,
+            [`questions.${questionIndex}.feedback`]: "No answer provided",
+            [`questions.${questionIndex}.answer`]: "",
+          }
+        }
+      );
+      return res.json({ feedback: "No answer provided", score: 0 });
     }
 
     if (timeTaken > question.timeLimit) {
-      question.score = 0;
-      question.feedback = "Time limit exceeded";
-      question.answer = answer;
-
-      await interview.save();
-      return res.json({ feedback: question.feedback, score: 0 });
+      // PERFORMANCE OPTIMIZATION: Perform a direct atomic update using updateOne.
+      await Interview.updateOne(
+        { _id: interviewId },
+        {
+          $set: {
+            [`questions.${questionIndex}.score`]: 0,
+            [`questions.${questionIndex}.feedback`]: "Time limit exceeded",
+            [`questions.${questionIndex}.answer`]: answer,
+          }
+        }
+      );
+      return res.json({ feedback: "Time limit exceeded", score: 0 });
     }
 
     const message = [
@@ -379,17 +395,32 @@ export const submitAnswer = async (req, res) => {
       return Math.max(0, Math.min(10, Math.round(num)));
     };
 
-    question.confidence = sanitizeScore(parsedResponse.confidence);
-    question.communication = sanitizeScore(parsedResponse.communication);
-    question.correctness = sanitizeScore(parsedResponse.correctness);
-    question.score = sanitizeScore(parsedResponse.finalScore);
+    const confidence = sanitizeScore(parsedResponse.confidence);
+    const communication = sanitizeScore(parsedResponse.communication);
+    const correctness = sanitizeScore(parsedResponse.correctness);
+    const score = sanitizeScore(parsedResponse.finalScore);
 
     // Sanitize feedback to prevent stored XSS attacks and limit to 500 characters
     const rawFeedback = typeof parsedResponse.feedback === "string" ? parsedResponse.feedback : "";
-    question.feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
+    const feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
 
-    await interview.save();
-    return res.status(200).json({ feedback: question.feedback, score: question.score });
+    // PERFORMANCE OPTIMIZATION: Perform a direct atomic update using updateOne
+    // instead of hydrated .save(), saving document overhead, bypassing change-tracking.
+    await Interview.updateOne(
+      { _id: interviewId },
+      {
+        $set: {
+          [`questions.${questionIndex}.confidence`]: confidence,
+          [`questions.${questionIndex}.communication`]: communication,
+          [`questions.${questionIndex}.correctness`]: correctness,
+          [`questions.${questionIndex}.score`]: score,
+          [`questions.${questionIndex}.feedback`]: feedback,
+          [`questions.${questionIndex}.answer`]: answer,
+        }
+      }
+    );
+
+    return res.status(200).json({ feedback, score });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Failed to submit answer" });
