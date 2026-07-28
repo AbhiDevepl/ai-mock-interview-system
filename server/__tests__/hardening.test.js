@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import User from '../models/user.model.js';
 import { jest } from '@jest/globals';
+import fs from 'fs';
 
 // MOCKING FIREBASE BEFORE CONTROLLER IMPORT
 jest.unstable_mockModule('firebase-admin/app', () => ({
@@ -28,10 +29,25 @@ jest.unstable_mockModule('../config/token.js', () => ({
 
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+
+// Custom mock auth middleware to inject user ID for testing
+const testAuth = (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || '660000000000000000000001';
+  next();
+};
+
+app.get('/api/user/current-user', testAuth, getCurrentUser);
+app.post('/api/interview/generate-question', testAuth, generateQuestion);
+app.post('/api/interview/resume', testAuth, (req, res, next) => {
+  req.file = { path: 'test-resume.pdf' };
+  next();
+}, analyzeResume);
 
 let mongoServer;
 
@@ -101,5 +117,96 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('Deactivation Hardening for profile and metered AI endpoints', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  describe('GET /api/user/current-user', () => {
+    it('should reject deactivated users and clear session cookies', async () => {
+      const user = await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .get('/api/user/current-user')
+        .set('x-user-id', user._id.toString());
+
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe('Unauthorized access.');
+      const cookies = response.headers['set-cookie'] || [];
+      expect(cookies.some(c => c.includes('token='))).toBe(true);
+      expect(cookies.some(c => c.includes('refreshToken='))).toBe(true);
+    });
+
+    it('should allow active users', async () => {
+      const user = await User.create({
+        _id: '660000000000000000000001',
+        name: 'Active User',
+        email: 'active@example.com',
+        isActive: true,
+      });
+
+      const response = await request(app)
+        .get('/api/user/current-user')
+        .set('x-user-id', user._id.toString());
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe('Active User');
+      expect(response.body).not.toHaveProperty('isActive');
+    });
+  });
+
+  describe('POST /api/interview/generate-question', () => {
+    it('should reject deactivated users', async () => {
+      const user = await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .set('x-user-id', user._id.toString())
+        .send({
+          role: 'Engineer',
+          experience: '2 years',
+          mode: 'Technical',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('Account is deactivated.');
+    });
+  });
+
+  describe('POST /api/interview/resume', () => {
+    it('should reject deactivated users and safely clean up the uploaded file', async () => {
+      const user = await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        isActive: false,
+      });
+
+      // Write a dummy file to simulate the uploaded file path
+      fs.writeFileSync('test-resume.pdf', 'dummy content');
+
+      const response = await request(app)
+        .post('/api/interview/resume')
+        .set('x-user-id', user._id.toString());
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('Account is deactivated.');
+
+      // Verify that the file was successfully deleted/unlinked from the server
+      expect(fs.existsSync('test-resume.pdf')).toBe(false);
+    });
   });
 });
