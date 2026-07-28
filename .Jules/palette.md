@@ -13,3 +13,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-02-24 - Dropdown Navigation & Modal Dismiss Keyboard Focus
 **Learning:** When developing utility-first layouts, dropdown action items and modal dismissal triggers are frequently given custom click actions but lack default system outlines. Adding custom focus indicators (`focus-visible:ring-2`) and background transitions (`hover:bg-emerald-50`) ensures that both keyboard and motor-impaired users can confidently navigate nested menus.
 **Action:** Ensure all button elements inside dynamic overlays (such as dropdowns and modal close buttons) explicitly define cohesive focus rings matching the brand color scheme.
+
+## 2025-02-28 - Drag and Drop Upload Visual Feedback
+**Learning:** Standard custom upload containers only support file selection on click, leaving keyboard and mouse-reliant users unaware of native drag-and-drop mechanics. Adding event-driven drag/drop event triggers with styled container borders and scale changes dramatically increases visual clarity and delights users with responsive interactions.
+**Action:** When designing customized file uploaders, always implement onDragOver, onDragLeave, and onDrop with transitional styles and feedback text to clarify drag-and-drop functionality.
