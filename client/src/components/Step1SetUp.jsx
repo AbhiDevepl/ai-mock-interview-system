@@ -35,11 +35,42 @@ function Step1SetUp({ onStart }) {
   const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const closeUploadModal = () => {
     setIsUploadOpen(false);
     setAnalysisStatus(null);
     setAnalysisError("");
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e) => {
+    if (analysisStatus === "success") return;
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (analysisStatus === "success") return;
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    if (analysisStatus === "success") return;
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      if (file.type === "application/pdf") {
+        setResumeFile(file);
+        setAnalysisStatus(null);
+        setAnalysisError("");
+      } else {
+        setAnalysisStatus("error");
+        setAnalysisError("Only PDF files are supported.");
+      }
+    }
   };
 
   React.useEffect(() => {
@@ -428,12 +459,17 @@ function Step1SetUp({ onStart }) {
                       }
                     }
               }
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               tabIndex={analysisStatus === "success" ? -1 : 0}
               role={analysisStatus === "success" ? undefined : "button"}
               aria-label={analysisStatus === "success" ? "Resume analyzed successfully" : "Upload resume (Optional)"}
-              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 analysisStatus === "success"
                   ? "border-emerald-300 bg-emerald-50/60"
+                  : isDragging
+                  ? "border-emerald-500 bg-emerald-50/80 scale-[1.02] shadow-md shadow-emerald-100"
                   : "border-gray-300 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60"
               }`}
             >
@@ -444,7 +480,11 @@ function Step1SetUp({ onStart }) {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files[0];
-                  if (file) setResumeFile(file);
+                  if (file) {
+                    setResumeFile(file);
+                    setAnalysisStatus(null);
+                    setAnalysisError("");
+                  }
                 }}
               />
               {analysisStatus === "success" ? (
@@ -459,12 +499,14 @@ function Step1SetUp({ onStart }) {
               ) : (
                 <>
                   <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
-                    <FaFileUpload className="text-2xl text-emerald-600" />
+                    <FaFileUpload className={`text-2xl transition-colors ${isDragging ? "text-emerald-700" : "text-emerald-600"}`} />
                   </span>
                   <p className="mt-3 text-gray-700 font-medium">
-                    {resumeFile
+                    {isDragging
+                      ? "Drop your resume here!"
+                      : resumeFile
                       ? resumeFile.name
-                      : "Click to upload resume (Optional)"}
+                      : "Drag & drop or click to upload resume (Optional)"}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
