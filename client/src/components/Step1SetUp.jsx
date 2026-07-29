@@ -37,6 +37,10 @@ function Step1SetUp({ onStart }) {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  const uploadTriggerRef = React.useRef(null);
+  const modalRef = React.useRef(null);
+  const closeBtnRef = React.useRef(null);
+
   const closeUploadModal = () => {
     setIsUploadOpen(false);
     setAnalysisStatus(null);
@@ -75,13 +79,55 @@ function Step1SetUp({ onStart }) {
 
   React.useEffect(() => {
     if (!isUploadOpen) return;
+
+    // Shift focus to the close button inside the modal when it opens
+    if (closeBtnRef.current) {
+      closeBtnRef.current.focus();
+    }
+
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         closeUploadModal();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        if (!modalRef.current) return;
+        // Find all focusable elements inside the modal
+        const focusableElements = modalRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          // Shift + Tab: if on the first element, wrap to the last
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          // Tab: if on the last element, wrap to the first
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
       }
     };
+
+    const currentTrigger = uploadTriggerRef.current;
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      // Restore focus to the trigger button when the modal closes
+      if (currentTrigger) {
+        currentTrigger.focus();
+      }
+    };
   }, [isUploadOpen]);
 
   const validate = () => {
@@ -317,6 +363,7 @@ function Step1SetUp({ onStart }) {
               <div className="flex gap-2">
                 <button
                   id="resume-upload-trigger"
+                  ref={uploadTriggerRef}
                   type="button"
                   onClick={() => setIsUploadOpen(true)}
                   className="flex-1 flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
@@ -424,11 +471,13 @@ function Step1SetUp({ onStart }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="upload-resume-title"
+            ref={modalRef}
             className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
           >
             <button
               type="button"
               onClick={closeUploadModal}
+              ref={closeBtnRef}
               aria-label="Close upload modal"
               className="absolute top-4 right-4 text-gray-500 hover:text-black transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-full p-1"
             >

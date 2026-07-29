@@ -17,3 +17,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-02-28 - Drag and Drop Upload Visual Feedback
 **Learning:** Standard custom upload containers only support file selection on click, leaving keyboard and mouse-reliant users unaware of native drag-and-drop mechanics. Adding event-driven drag/drop event triggers with styled container borders and scale changes dramatically increases visual clarity and delights users with responsive interactions.
 **Action:** When designing customized file uploaders, always implement onDragOver, onDragLeave, and onDrop with transitional styles and feedback text to clarify drag-and-drop functionality.
+
+## 2025-03-01 - Modal Overlay Focus Management
+**Learning:** Overlays and custom dialogue modals in React applications often trap keyboard focus naturally, but fail to reset focus when dismissing or shift focus correctly when initializing. Manually capturing the pre-modal trigger element and restoring focus to it, alongside trapping keyboard tab transitions inside the modal itself, completes the user journey for screen readers and power-users.
+**Action:** Always implement explicit ref tracking and manual `.focus()` handling inside modal mount/unmount and keyboard tab traps to ensure non-mouse users are never lost or stranded.
