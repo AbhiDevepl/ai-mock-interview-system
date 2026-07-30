@@ -23,3 +23,7 @@
 ## 2026-07-26 - High-Performance Positional Subdocument Updates in Mongoose
 **Learning:** When retrieving and modifying specific elements inside subdocument arrays (such as the `questions` array in the `Interview` model), a hydrated document's `.save()` method is extremely slow due to Mongoose tracking changes across the entire array and casting/validating all subdocuments. Bypassing hydration using `.lean()` and executing targeted positional array updates using `updateOne` with `questions.${index}.field` dot notation is incredibly efficient and avoids any change-tracking or full document serialization overhead.
 **Action:** For all updates modifying specific indexes of nested arrays in Mongo schemas, fetch the doc with `.lean()` and write changes atomically using positional paths with `updateOne`.
+
+## 2026-07-27 - High-Performance OAuth Login Workflows with Atomic Updates
+**Learning:** For high-frequency OAuth login paths (such as `googleAuth`), querying the user via `.findOne().lean()` avoids costly Mongoose document hydration. Furthermore, updating user details (e.g., name, picture, lastLoginAt) using an atomic `findOneAndUpdate` with `{ new: true }` and `.lean()` completely bypasses model change tracking, schema validations, and `.save()` hook execution overhead.
+**Action:** Always prefer `.findOne().lean()` followed by an atomic `findOneAndUpdate` update with `.lean()` for high-throughput login update flows.
