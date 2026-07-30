@@ -160,6 +160,8 @@ export const refreshAuth = async (req, res) => {
       .select('_id name email picture credits role lastLoginAt createdAt isActive')
       .lean();
     if (!user || !user.isActive) {
+      res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
       return res.status(401).json({ message: "Authentication required." });
     }
 
