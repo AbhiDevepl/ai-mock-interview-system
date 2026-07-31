@@ -15,6 +15,9 @@ export const askAi = async (messages) => {
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
           "Content-Type": "application/json",
         },
+        // Security enhancement: Specify a strict 15-second timeout on the external request.
+        // This prevents resource exhaustion and Denial of Service (DoS) if the Groq API lags or hangs indefinitely.
+        timeout: 15000,
       },
     );
     const content = response?.data?.choices?.[0]?.message?.content;
@@ -23,7 +26,7 @@ export const askAi = async (messages) => {
     }
     return content;
   } catch (error) {
-    if (error.message === "AI returned empty response") throw error;
+    if (error.message === "AI returned empty response" || error.message === "Message array is empty.") throw error;
     console.error("Groq Error:", error.response?.data || error.message);
     throw new Error("Groq API Error");
   }
