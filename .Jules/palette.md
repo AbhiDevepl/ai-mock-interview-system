@@ -17,3 +17,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-02-28 - Drag and Drop Upload Visual Feedback
 **Learning:** Standard custom upload containers only support file selection on click, leaving keyboard and mouse-reliant users unaware of native drag-and-drop mechanics. Adding event-driven drag/drop event triggers with styled container borders and scale changes dramatically increases visual clarity and delights users with responsive interactions.
 **Action:** When designing customized file uploaders, always implement onDragOver, onDragLeave, and onDrop with transitional styles and feedback text to clarify drag-and-drop functionality.
+
+## 2025-02-28 - Keyboard Arrow Navigation & Roving TabIndex for Visual Radio Cards
+**Learning:** Custom visual cards acting as semantic radiogroups are common in personalized user flows but are inaccessible to screen readers and keyboard-only users by default. Implementing standard arrow key navigation (ArrowLeft/ArrowRight/ArrowUp/ArrowDown, Home, End) alongside a roaming tabIndex (where only the active element has `tabIndex={0}` and others have `tabIndex={-1}`) provides a standard, native-like, accessible keyboard interaction model.
+**Action:** Always implement standard arrow key handlers, unique focusable button IDs, roaming tabIndex, and group labeling (`aria-labelledby`) for custom radiogroup controls.

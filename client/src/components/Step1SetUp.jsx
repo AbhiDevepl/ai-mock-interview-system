@@ -29,6 +29,33 @@ function Step1SetUp({ onStart }) {
   const [experience, setExperience] = useState("");
   const [mode, setMode] = useState("Technical");
   const [errors, setErrors] = useState({});
+
+  const handleModeKeyDown = (e) => {
+    const currentIndex = MODES.findIndex((m) => m.id === mode);
+    let nextIndex = currentIndex;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      nextIndex = (currentIndex + 1) % MODES.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      nextIndex = (currentIndex - 1 + MODES.length) % MODES.length;
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      nextIndex = MODES.length - 1;
+    } else {
+      return;
+    }
+
+    const nextMode = MODES[nextIndex].id;
+    setMode(nextMode);
+    setTimeout(() => {
+      document.getElementById(`mode-btn-${nextMode}`)?.focus();
+    }, 0);
+  };
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
@@ -287,26 +314,37 @@ function Step1SetUp({ onStart }) {
             </div>
 
             <div>
-              <span className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <span id="interview-mode-label" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Interview Mode <span className="text-red-500">*</span>
               </span>
-              <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Interview Mode">
-                {MODES.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setMode(m.id)}
-                    role="radio"
-                    aria-checked={mode === m.id}
-                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500 ${mode === m.id
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
-                        : "border-gray-200 hover:border-emerald-300 text-gray-600"
+              <div
+                className="grid grid-cols-3 gap-3"
+                role="radiogroup"
+                aria-labelledby="interview-mode-label"
+              >
+                {MODES.map((m) => {
+                  const isActive = mode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      id={`mode-btn-${m.id}`}
+                      type="button"
+                      onClick={() => setMode(m.id)}
+                      onKeyDown={handleModeKeyDown}
+                      role="radio"
+                      aria-checked={isActive}
+                      tabIndex={isActive ? 0 : -1}
+                      className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500 ${
+                        isActive
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
+                          : "border-gray-200 hover:border-emerald-300 text-gray-600"
                       }`}
-                  >
-                    <m.icon className="text-xl" />
-                    <span className="font-medium text-sm">{m.label}</span>
-                  </button>
-                ))}
+                    >
+                      <m.icon className="text-xl" />
+                      <span className="font-medium text-sm">{m.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
