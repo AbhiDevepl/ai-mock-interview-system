@@ -76,25 +76,36 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    let user = await User.findOne({ email });
+    // PERFORMANCE OPTIMIZATION: Query the user using .findOne().lean() to completely bypass Mongoose model hydration overhead.
+    let user = await User.findOne({ email }).lean();
 
     if (!user) {
-      user = await User.create({
+      const newUser = await User.create({
         name: firebaseName || email.split("@")[0],
         email,
         picture: firebasePicture || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
+      user = newUser.toObject();
     } else {
       if (!user.isActive) {
         return res.status(403).json({ message: "This account has been deactivated." });
       }
-      if (firebaseName) user.name = firebaseName;
-      if (firebasePicture) user.picture = firebasePicture;
-      if (firebaseUID) user.firebaseUID = firebaseUID;
-      user.lastLoginAt = new Date();
-      await user.save();
+      // PERFORMANCE OPTIMIZATION: On login update flow, perform updates atomically using findOneAndUpdate with { new: true } and .lean()
+      // to completely skip model change-tracking, schema validations, and .save() hook execution overhead.
+      const updateData = {
+        lastLoginAt: new Date(),
+      };
+      if (firebaseName) updateData.name = firebaseName;
+      if (firebasePicture) updateData.picture = firebasePicture;
+      if (firebaseUID) updateData.firebaseUID = firebaseUID;
+
+      user = await User.findOneAndUpdate(
+        { _id: user._id },
+        { $set: updateData },
+        { new: true }
+      ).lean();
     }
 
     const token = genToken(user._id, user.role);
