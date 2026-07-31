@@ -76,25 +76,34 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    let user = await User.findOne({ email });
+    // Performance Optimization: Use .findOne().lean() to skip full Mongoose document hydration
+    // for existing user queries, and run updates atomically with findOneAndUpdate and .lean().
+    let user = await User.findOne({ email }).lean();
 
     if (!user) {
-      user = await User.create({
+      const newUser = await User.create({
         name: firebaseName || email.split("@")[0],
         email,
         picture: firebasePicture || "",
         firebaseUID,
         lastLoginAt: new Date(),
       });
+      user = newUser.toObject();
     } else {
       if (!user.isActive) {
         return res.status(403).json({ message: "This account has been deactivated." });
       }
-      if (firebaseName) user.name = firebaseName;
-      if (firebasePicture) user.picture = firebasePicture;
-      if (firebaseUID) user.firebaseUID = firebaseUID;
-      user.lastLoginAt = new Date();
-      await user.save();
+      const updateData = {};
+      if (firebaseName && firebaseName !== user.name) updateData.name = firebaseName;
+      if (firebasePicture && firebasePicture !== user.picture) updateData.picture = firebasePicture;
+      if (firebaseUID && firebaseUID !== user.firebaseUID) updateData.firebaseUID = firebaseUID;
+      updateData.lastLoginAt = new Date();
+
+      user = await User.findOneAndUpdate(
+        { email },
+        { $set: updateData },
+        { new: true, runValidators: true }
+      ).lean();
     }
 
     const token = genToken(user._id, user.role);
