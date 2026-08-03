@@ -223,9 +223,11 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center">
                     <div className="w-full md:w-1/2 flex justify-center">
+                      {/* PERFORMANCE OPTIMIZATION: Defer loading below-the-fold capabilities images using loading="lazy" */}
                       <img
                         src={item.img}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-auto object-contain max-h-64"
                       />
                     </div>
@@ -266,9 +268,11 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center gap-6">
                     <div className="w-full md:w-1/2 flex justify-center">
+                      {/* PERFORMANCE OPTIMIZATION: Defer loading below-the-fold modes images using loading="lazy" */}
                       <img
                         src={item.img}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-auto object-contain max-h-48"
                       />
                     </div>
