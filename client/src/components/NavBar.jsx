@@ -68,14 +68,18 @@ function NavBar() {
         className="w-full max-w-6xl bg-white rounded-[24px] shadow-sm border border-gray-200
         px-8 py-4 flex items-center relative justify-between"
       >
-        <div className="flex items-center gap-3 cursor-pointer">
+        <button
+          onClick={() => navigate("/")}
+          aria-label="InterviewIQ.AI home"
+          className="flex items-center gap-3 cursor-pointer hover:bg-gray-100/60 rounded-xl px-2 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+        >
           <div className="bg-black text-white p-2 rounded-lg">
             <BsRobot size={18} />
           </div>
-          <h1 className="font-semibold hidden md:block text-lg">
+          <span className="font-semibold hidden md:block text-lg text-gray-950">
             InterviewIQ.AI
-          </h1>
-        </div>
+          </span>
+        </button>
 
         <div className="flex items-center gap-6 relative">
           <div className="relative" ref={creditsRef}>
