@@ -27,11 +27,26 @@ jest.unstable_mockModule('../config/token.js', () => ({
 }));
 
 // NOW IMPORT CONTROLLER
-const { googleAuth } = await import('../controllers/auth.controller.js');
+const { googleAuth, getMe } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, analyzeResume, submitAnswer } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(express.json());
+
+// Set up routes with a middleware that sets a default req.userId
+const bindUserMiddleware = (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  req.userRole = 'user';
+  next();
+};
+
 app.post('/api/auth/google', googleAuth);
+app.get('/api/auth/me', bindUserMiddleware, getMe);
+app.get('/api/user/current-user', bindUserMiddleware, getCurrentUser);
+app.post('/api/interview/generate-question', bindUserMiddleware, generateQuestion);
+app.post('/api/interview/resume', bindUserMiddleware, analyzeResume);
+app.post('/api/interview/submit-answer', bindUserMiddleware, submitAnswer);
 
 let mongoServer;
 
@@ -101,5 +116,89 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('Deactivated users hardening for other endpoints', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('getCurrentUser should deny deactivated users and clear cookies', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Banned User',
+      email: 'banned@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Ensure cookies are cleared by checking the set-cookie header
+    const setCookie = response.headers['set-cookie'];
+    expect(setCookie).toBeDefined();
+    const joinedCookie = setCookie.join(';');
+    expect(joinedCookie).toContain('token=;');
+    expect(joinedCookie).toContain('refreshToken=;');
+    expect(joinedCookie).toContain('deviceId=;');
+  });
+
+  it('generateQuestion should deny deactivated users', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Banned User',
+      email: 'banned@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .send({
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('analyzeResume should deny deactivated users', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Banned User',
+      email: 'banned@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/resume');
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('submitAnswer should deny deactivated users', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Banned User',
+      email: 'banned@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/submit-answer')
+      .send({
+        interviewId: '660000000000000000000002',
+        questionIndex: 0,
+        answer: 'Hello',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
   });
 });

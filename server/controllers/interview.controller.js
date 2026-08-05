@@ -9,6 +9,15 @@ export const analyzeResume = async (req, res) => {
   const filepath = req.file?.path;
 
   try {
+    // Check if requesting user's account has been deactivated
+    const requestUser = await User.findById(req.userId).select("isActive").lean();
+    if (requestUser && requestUser.isActive === false) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
+
     if (!req.file) {
       return res.status(400).json({ message: "Resume required" });
     }
@@ -80,6 +89,12 @@ export const analyzeResume = async (req, res) => {
 export const generateQuestion = async (req, res) => {
   try {
     const { role: rawRole, experience: rawExperience, mode: rawMode, projects, skills, resumeText } = req.body;
+
+    // Check if requesting user's account has been deactivated
+    const requestUserCheck = await User.findById(req.userId).select("isActive").lean();
+    if (requestUserCheck && requestUserCheck.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
     const role = typeof rawRole === "string" ? rawRole.trim() : "";
     const experience = typeof rawExperience === "string" ? rawExperience.trim() : "";
     const mode = typeof rawMode === "string" ? rawMode.trim() : "";
@@ -244,6 +259,12 @@ export const generateQuestion = async (req, res) => {
 export const submitAnswer = async (req, res) => {
   try {
     const { interviewId, questionIndex, answer, timeTaken } = req.body;
+
+    // Check if requesting user's account has been deactivated
+    const requestUserCheck = await User.findById(req.userId).select("isActive").lean();
+    if (requestUserCheck && requestUserCheck.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
 
     if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
       return res.status(400).json({ message: "Invalid interview ID format." });
