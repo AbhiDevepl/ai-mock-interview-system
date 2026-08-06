@@ -28,10 +28,15 @@ jest.unstable_mockModule('../config/token.js', () => ({
 
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  next();
+}, getCurrentUser);
 
 let mongoServer;
 
@@ -101,5 +106,49 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('getCurrentUser Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should return user info when user is active', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+    expect(response.body.email).toBe('active@example.com');
+    expect(response.body.isActive).toBeUndefined(); // ensure isActive is excluded
+  });
+
+  it('should clear cookies and return 401 when user is deactivated', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user');
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // verify cookies are cleared
+    const cookieHeaders = response.headers['set-cookie'] || [];
+    expect(cookieHeaders.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookieHeaders.some(c => c.includes('refreshToken=;'))).toBe(true);
+    expect(cookieHeaders.some(c => c.includes('deviceId=;'))).toBe(true);
   });
 });
