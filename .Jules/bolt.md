@@ -27,3 +27,7 @@
 ## 2026-07-27 - High-Performance OAuth Login Workflows with Atomic Updates
 **Learning:** For high-frequency OAuth login paths (such as `googleAuth`), querying the user via `.findOne().lean()` avoids costly Mongoose document hydration. Furthermore, updating user details (e.g., name, picture, lastLoginAt) using an atomic `findOneAndUpdate` with `{ new: true }` and `.lean()` completely bypasses model change tracking, schema validations, and `.save()` hook execution overhead.
 **Action:** Always prefer `.findOne().lean()` followed by an atomic `findOneAndUpdate` update with `.lean()` for high-throughput login update flows.
+
+## 2026-07-28 - Native Image Lazy Loading for Critical Landing Page Performance Wins
+**Learning:** Landing pages containing multiple high-resolution illustrative images (e.g. capabilities and feature cards) below the fold can suffer from poor Time to Interactive (TTI), high initial bandwidth usage, and delayed LCP due to concurrent network requests. Applying standard native `loading="lazy"` to these `img` elements prevents browsers from fetching them before they enter the viewport, saving ~1.3MB of initial payload without any script parsing overhead or hydration requirements.
+**Action:** Always ensure below-the-fold visual components and promotional lists leverage native browser image lazy loading to prioritize critical paths and optimize initial payload sizes.
