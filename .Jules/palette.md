@@ -21,3 +21,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-02-28 - Keyboard Arrow Navigation & Roving TabIndex for Visual Radio Cards
 **Learning:** Custom visual cards acting as semantic radiogroups are common in personalized user flows but are inaccessible to screen readers and keyboard-only users by default. Implementing standard arrow key navigation (ArrowLeft/ArrowRight/ArrowUp/ArrowDown, Home, End) alongside a roaming tabIndex (where only the active element has `tabIndex={0}` and others have `tabIndex={-1}`) provides a standard, native-like, accessible keyboard interaction model.
 **Action:** Always implement standard arrow key handlers, unique focusable button IDs, roaming tabIndex, and group labeling (`aria-labelledby`) for custom radiogroup controls.
+
+## 2025-03-01 - Branding Logo Semantic Focus & Navigation
+**Learning:** Branding logos in app headers are often designed with simple click listeners (`cursor-pointer` on a `div`), completely isolating screen reader and keyboard-only users from returning to the home page seamlessly. Converting these static containers into semantic `<button>` elements with `aria-label`, visible focus state rings (`focus-visible:ring-2`), and background hover transitions elevates standard header layouts to be fully inclusive and keyboard navigable.
+**Action:** Always convert header branding or navigation logos into semantic `<button>` elements with clear labels, focus indicators, and smooth hover background transitions.
