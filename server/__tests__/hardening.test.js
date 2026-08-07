@@ -28,10 +28,18 @@ jest.unstable_mockModule('../config/token.js', () => ({
 
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+
+// Mock a simple middleware to bind a mock userId to req, mimicking isAuth
+app.get('/api/user/current-user', (req, res, next) => {
+  // Bind userId from request query or header for testing purposes
+  req.userId = req.headers['x-user-id'] || req.query.userId;
+  next();
+}, getCurrentUser);
 
 let mongoServer;
 
@@ -101,5 +109,42 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('getCurrentUser Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should reject deactivated users in getCurrentUser', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user')
+      .set('x-user-id', user._id.toString());
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+  });
+
+  it('should return 200 for active users and omit isActive field', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user')
+      .set('x-user-id', user._id.toString());
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+    expect(response.body.isActive).toBeUndefined();
   });
 });
