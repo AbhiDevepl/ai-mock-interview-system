@@ -21,3 +21,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-02-28 - Keyboard Arrow Navigation & Roving TabIndex for Visual Radio Cards
 **Learning:** Custom visual cards acting as semantic radiogroups are common in personalized user flows but are inaccessible to screen readers and keyboard-only users by default. Implementing standard arrow key navigation (ArrowLeft/ArrowRight/ArrowUp/ArrowDown, Home, End) alongside a roaming tabIndex (where only the active element has `tabIndex={0}` and others have `tabIndex={-1}`) provides a standard, native-like, accessible keyboard interaction model.
 **Action:** Always implement standard arrow key handlers, unique focusable button IDs, roaming tabIndex, and group labeling (`aria-labelledby`) for custom radiogroup controls.
+
+## 2025-03-01 - Modal Overlay Focus Management
+**Learning:** Overlays and custom dialogue modals in React applications often trap keyboard focus naturally, but fail to reset focus when dismissing or shift focus correctly when initializing. Manually capturing the pre-modal trigger element and restoring focus to it, alongside trapping keyboard tab transitions inside the modal itself, completes the user journey for screen readers and power-users.
+**Action:** Always implement explicit ref tracking and manual `.focus()` handling inside modal mount/unmount and keyboard tab traps to ensure non-mouse users are never lost or stranded.
