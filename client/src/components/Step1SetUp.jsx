@@ -19,8 +19,6 @@ const MODES = [
   { id: "System Design", label: "System Design", icon: FaChartLine },
 ];
 
-
-
 function Step1SetUp({ onStart }) {
   const [loading, setLoading] = useState(false);
   const {userData}= useSelector((state)=>state.user);
@@ -62,42 +60,11 @@ function Step1SetUp({ onStart }) {
   const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   const closeUploadModal = () => {
     setIsUploadOpen(false);
     setAnalysisStatus(null);
     setAnalysisError("");
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e) => {
-    if (analysisStatus === "success") return;
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e) => {
-    if (analysisStatus === "success") return;
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    if (analysisStatus === "success") return;
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) {
-      if (file.type === "application/pdf") {
-        setResumeFile(file);
-        setAnalysisStatus(null);
-        setAnalysisError("");
-      } else {
-        setAnalysisStatus("error");
-        setAnalysisError("Only PDF files are supported.");
-      }
-    }
   };
 
   React.useEffect(() => {
@@ -352,46 +319,31 @@ function Step1SetUp({ onStart }) {
               <label htmlFor="resume-upload-trigger" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Resume
               </label>
-              <div className="flex gap-2">
-                <button
-                  id="resume-upload-trigger"
-                  type="button"
-                  onClick={() => setIsUploadOpen(true)}
-                  className="flex-1 flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
+              <button
+                id="resume-upload-trigger"
+                type="button"
+                onClick={() => setIsUploadOpen(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                  <FaFileUpload className="text-emerald-600" />
+                </span>
+                <span
+                  className={`truncate font-medium ${
+                    resumeFile ? "text-gray-800" : "text-gray-500"
+                  }`}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                    <FaFileUpload className="text-emerald-600" />
-                  </span>
-                  <span
-                    className={`truncate font-medium ${
-                      resumeFile ? "text-gray-800" : "text-gray-500"
-                    }`}
-                  >
-                    {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
-                  </span>
-                </button>
-                {resumeFile && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResumeFile(null);
-                      setAnalysisResult(null);
-                      setAnalysisStatus(null);
-                    }}
-                    aria-label="Remove uploaded resume"
-                    className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20 focus-visible:border-red-500 cursor-pointer"
-                  >
-                    <FaTimes size={18} />
-                  </button>
-                )}
-              </div>
+                  {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
+                </span>
+              </button>
             </div>
           </div>
           {analysisStatus === "success" && analysisResult && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-gray-50 border-gray-200 rounded-xl p-5 space-y-4">
+              className="bg-gray-50 border-gray-200 rounded-xl p-5 space-y-4"
+            >
               <h3 className="text-lg font-semibold text-gray-800">
                 Resume Analysis Result
               </h3>
@@ -487,27 +439,24 @@ function Step1SetUp({ onStart }) {
                   ? undefined
                   : () => document.getElementById("resumeUpload")?.click()
               }
-              onKeyDown={
-                analysisStatus === "success"
-                  ? undefined
-                  : (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        document.getElementById("resumeUpload")?.click();
-                      }
-                    }
-              }
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              tabIndex={analysisStatus === "success" ? -1 : 0}
+              onKeyDown={(e) => {
+                if (analysisStatus !== "success" && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  document.getElementById("resumeUpload")?.click();
+                }
+              }}
               role={analysisStatus === "success" ? undefined : "button"}
-              aria-label={analysisStatus === "success" ? "Resume analyzed successfully" : "Upload resume (Optional)"}
-              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+              tabIndex={analysisStatus === "success" ? undefined : 0}
+              aria-label={
+                analysisStatus === "success"
+                  ? "Resume analyzed successfully"
+                  : resumeFile
+                  ? `Selected resume file: ${resumeFile.name}. Click or press Enter to change.`
+                  : "Click or press Enter to upload PDF resume"
+              }
+              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 analysisStatus === "success"
                   ? "border-emerald-300 bg-emerald-50/60"
-                  : isDragging
-                  ? "border-emerald-500 bg-emerald-50/80 scale-[1.02] shadow-md shadow-emerald-100"
                   : "border-gray-300 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60"
               }`}
             >
@@ -518,11 +467,7 @@ function Step1SetUp({ onStart }) {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files[0];
-                  if (file) {
-                    setResumeFile(file);
-                    setAnalysisStatus(null);
-                    setAnalysisError("");
-                  }
+                  if (file) setResumeFile(file);
                 }}
               />
               {analysisStatus === "success" ? (
@@ -537,14 +482,12 @@ function Step1SetUp({ onStart }) {
               ) : (
                 <>
                   <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
-                    <FaFileUpload className={`text-2xl transition-colors ${isDragging ? "text-emerald-700" : "text-emerald-600"}`} />
+                    <FaFileUpload className="text-2xl text-emerald-600" />
                   </span>
                   <p className="mt-3 text-gray-700 font-medium">
-                    {isDragging
-                      ? "Drop your resume here!"
-                      : resumeFile
+                    {resumeFile
                       ? resumeFile.name
-                      : "Drag & drop or click to upload resume (Optional)"}
+                      : "Click to upload resume (Optional)"}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
@@ -556,19 +499,9 @@ function Step1SetUp({ onStart }) {
                         handleUploadResume();
                       }}
                       disabled={analyzing}
-                      className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 mx-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                      className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                     >
-                      {analyzing ? (
-                        <>
-                          <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Analyzing...
-                        </>
-                      ) : (
-                        "Analyze Resume"
-                      )}
+                      {analyzing ? "Analyzing..." : "Analyze Resume"}
                     </motion.button>
                   )}
                 </>
