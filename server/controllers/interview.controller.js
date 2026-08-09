@@ -261,6 +261,18 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
+    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
+    // as it is not needed here, saving network bandwidth and memory overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText");
+
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Unauthorized access." });
+    }
+
     if (
       questionIndex === undefined ||
       typeof questionIndex !== "number" ||
@@ -280,18 +292,6 @@ export const submitAnswer = async (req, res) => {
 
     if (answer !== undefined && answer.length > 5000) {
       return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
-    }
-
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // as it is not needed here, saving network bandwidth and memory overhead.
-    const interview = await Interview.findById(interviewId).select("-resumeText");
-
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
-
-    if (interview.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized access." });
     }
 
     const question = interview.questions[questionIndex];
@@ -365,16 +365,48 @@ export const submitAnswer = async (req, res) => {
       },
     ];
     const aiResponse = await askAi(message);
-    const parsedResponse = JSON.parse(aiResponse);
-    question.confidence = parsedResponse.confidence;
-    question.communication = parsedResponse.communication;
-    question.correctness = parsedResponse.correctness;
-    question.score = parsedResponse.finalScore;
-    question.feedback = parsedResponse.feedback;
+    let parsedResponse;
+    try {
+      // Clean possible Markdown JSON code block fences
+      const cleaned = aiResponse
+        .replace(/^\s*```(?:json)?\s*/i, "")
+        .replace(/\s*```\s*$/i, "")
+        .trim();
+      parsedResponse = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("AI Evaluation JSON parse error:", parseErr, "Response was:", aiResponse);
+      return res.status(500).json({ message: "Failed to parse evaluation from AI." });
+    }
+
+    if (!parsedResponse || typeof parsedResponse !== "object") {
+      return res.status(500).json({ message: "Invalid evaluation response from AI." });
+    }
+
+    // Securely validate and clamp scores to ensure they are safe numbers within 0-10
+    const sanitizeScore = (val) => {
+      const num = Number(val);
+      if (isNaN(num)) return 0;
+      return Math.max(0, Math.min(10, Math.round(num)));
+    };
+
+    const confidence = sanitizeScore(parsedResponse.confidence);
+    const communication = sanitizeScore(parsedResponse.communication);
+    const correctness = sanitizeScore(parsedResponse.correctness);
+    const score = sanitizeScore(parsedResponse.finalScore);
+
+    // Sanitize feedback to prevent stored XSS attacks and limit to 500 characters
+    const rawFeedback = typeof parsedResponse.feedback === "string" ? parsedResponse.feedback : "";
+    const feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
+
+    question.confidence = confidence;
+    question.communication = communication;
+    question.correctness = correctness;
+    question.score = score;
+    question.feedback = feedback;
     question.answer = answer;
 
     await interview.save();
-    return res.status(200).json({ feedback: question.feedback, score: question.score });
+    return res.status(200).json({ feedback, score });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Failed to submit answer" });
@@ -428,7 +460,7 @@ export const finishInterview = async (req, res) => {
         : 0;
        
     interview.finalScore = finalScore;
-    interview.status = "completed";
+    interview.status = "complete";
     await interview.save();
 
     return res.status(200).json({ 
@@ -436,6 +468,13 @@ export const finishInterview = async (req, res) => {
       confidence: Number(avgConfidence).toFixed(1),
       communication: Number(avgCommunication).toFixed(1),
       correctness: Number(avgCorrectness).toFixed(1),
+      questionWiseScore: interview.questions.map(q => ({
+        score: q.score,
+        confidence: q.confidence,
+        communication: q.communication,
+        correctness: q.correctness,
+        difficulty: q.difficulty
+      })),
       totalQuestions: totalQuestion
     });
   } catch (error) {

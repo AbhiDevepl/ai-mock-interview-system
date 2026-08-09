@@ -293,9 +293,11 @@ describe('Interview Controller Hardening & Validation', () => {
       expect(response.body.communication).toBe('6.0');
       expect(response.body.correctness).toBe('7.0');
       expect(response.body.questionWiseScore).toHaveLength(2);
+      expect(response.body.questionWiseScore[0]).toHaveProperty('score');
+      expect(response.body.questionWiseScore[0]).toHaveProperty('difficulty');
 
       const updated = await Interview.findById(interview._id).lean();
-      expect(updated.status).toBe('completed');
+      expect(updated.status).toBe('complete');
       expect(updated.finalScore).toBe(7);
     });
   });
