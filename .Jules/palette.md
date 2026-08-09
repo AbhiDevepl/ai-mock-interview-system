@@ -25,3 +25,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-03-01 - Modal Overlay Focus Management
 **Learning:** Overlays and custom dialogue modals in React applications often trap keyboard focus naturally, but fail to reset focus when dismissing or shift focus correctly when initializing. Manually capturing the pre-modal trigger element and restoring focus to it, alongside trapping keyboard tab transitions inside the modal itself, completes the user journey for screen readers and power-users.
 **Action:** Always implement explicit ref tracking and manual `.focus()` handling inside modal mount/unmount and keyboard tab traps to ensure non-mouse users are never lost or stranded.
+
+## 2025-03-03 - Header Brand Logo Accessibility & Navigation semantics
+**Learning:** Interactive branding logos are often built as non-semantic layout elements with custom click listeners but without keyboard focus support, focus rings, hover styles, or screen-reader labels. Converting these branding wrappers into semantic `<button>` elements with exact routing navigation, transition hover highlights, negative-margin compensations, and unique focus rings significantly enhances screen-reader usability.
+**Action:** When designing header and footer brand logo links, convert them into semantic button or link tags, provide distinct hover transitions, compensate padding spacing with negative margins, and add high-contrast focus indicators (`focus-visible:ring-2`) and descriptive `aria-label` tags.
