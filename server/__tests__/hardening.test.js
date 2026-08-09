@@ -28,10 +28,15 @@ jest.unstable_mockModule('../config/token.js', () => ({
 
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
 
 const app = express();
 app.use(express.json());
 app.post('/api/auth/google', googleAuth);
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, getCurrentUser);
 
 let mongoServer;
 
@@ -101,5 +106,53 @@ describe('googleAuth Controller hardening', () => {
     const user = await User.findOne({ email: 'newuser@example.com' });
     expect(user.name).toBe('Firebase Name');
     expect(user.picture).toBe('firebase-pic.jpg');
+  });
+});
+
+describe('getCurrentUser Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should reject deactivated users on getCurrentUser and clear cookies', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user')
+      .set('x-user-id', user._id.toString());
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Unauthorized access.');
+
+    // Check that cookies are cleared
+    const setCookie = response.headers['set-cookie'];
+    expect(setCookie).toBeDefined();
+    const setCookieStr = setCookie.join(';');
+    expect(setCookieStr).toContain('token=');
+    expect(setCookieStr).toContain('refreshToken=');
+    expect(setCookieStr).toContain('deviceId=');
+  });
+
+  it('should return active user profile on getCurrentUser and not leak isActive or firebaseUID', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+      firebaseUID: 'active-uid-123',
+    });
+
+    const response = await request(app)
+      .get('/api/user/current-user')
+      .set('x-user-id', user._id.toString());
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+    expect(response.body.email).toBe('active@example.com');
+    expect(response.body.isActive).toBeUndefined();
+    expect(response.body.firebaseUID).toBeUndefined();
   });
 });
