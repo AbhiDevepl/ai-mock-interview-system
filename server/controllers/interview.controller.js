@@ -110,16 +110,24 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
-    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits").lean();
-    if (!user) {
+    // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
+    // before calling the expensive AI service. This avoids fetching and hydrating
+    // unused fields, saving database bandwidth and server memory, and avoids
+    // AI calls for users with insufficient credits.
+    const userPreCheck = await User.findById(req.userId).select("credits").lean();
+    if (!userPreCheck) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (user.credits < 50) {
+    if (userPreCheck.credits < 50) {
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
+    }
+
+    // Now fetch full user data for the interview
+    const user = await User.findById(req.userId).select("_id name email credits").lean();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
     const projectText =
@@ -200,22 +208,26 @@ export const generateQuestion = async (req, res) => {
       return res.status(500).json({ message: "Failed to generate questions" });
     }
 
-    // PERFORMANCE OPTIMIZATION: Perform an atomic credit update on the plain DB document to prevent
-    // race conditions, avoid document save/hooks overhead, and use .lean() to bypass hydration.
+    // PERFORMANCE OPTIMIZATION: Deduct credits atomically only if the user has >= 50 credits.
+    // This prevents concurrent double-spending race conditions and avoids Mongoose document hydration.
     const updatedUser = await User.findOneAndUpdate(
       { _id: req.userId, credits: { $gte: 50 } },
       { $inc: { credits: -50 } },
-      { new: true, select: "credits" }
-    ).lean();
+      { new: true, select: "_id name email credits", lean: true }
+    );
 
     if (!updatedUser) {
+      const userExists = await User.findById(req.userId).select("_id").lean();
+      if (!userExists) {
+        return res.status(404).json({ message: "User not found" });
+      }
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
     }
 
     const interview = await Interview.create({
-      userId: user._id,
+      userId: updatedUser._id,
       questions: questionsArray.map((q, index) => ({
         question: q,
         difficulty: ["easy", "easy", "medium", "medium", "hard"][index],
@@ -232,7 +244,7 @@ export const generateQuestion = async (req, res) => {
     res.json({
       interviewId: interview._id,
       questions: interview.questions,
-      userName: user.name,
+      userName: updatedUser.name,
       creditLeft: updatedUser.credits,
     });
   } catch (error) {
@@ -253,7 +265,7 @@ export const submitAnswer = async (req, res) => {
       questionIndex === undefined ||
       typeof questionIndex !== "number" ||
       !Number.isInteger(questionIndex) ||
-      questionIndex < 0
+      questionIndex < 0 || questionIndex >= interview.questions.length
     ) {
       return res.status(400).json({ message: "Invalid question index." });
     }
@@ -270,9 +282,9 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Use .select("userId questions").lean() to bypass document hydration,
-    // saving considerable CPU/memory. Exclude heavy fields like 'resumeText' (which can be up to 100KB).
-    const interview = await Interview.findById(interviewId).select("userId questions").lean();
+    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
+    // as it is not needed here, saving network bandwidth and memory overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText");
 
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
@@ -282,41 +294,24 @@ export const submitAnswer = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized access." });
     }
 
-    if (questionIndex >= interview.questions.length) {
-      return res.status(400).json({ message: "Invalid question index." });
-    }
-
     const question = interview.questions[questionIndex];
 
     if (!answer) {
-      // PERFORMANCE OPTIMIZATION: Perform a direct atomic update using updateOne
-      // instead of hydrated .save(), saving document overhead and bypassing change-tracking.
-      await Interview.updateOne(
-        { _id: interviewId },
-        {
-          $set: {
-            [`questions.${questionIndex}.score`]: 0,
-            [`questions.${questionIndex}.feedback`]: "No answer provided",
-            [`questions.${questionIndex}.answer`]: "",
-          }
-        }
-      );
-      return res.json({ feedback: "No answer provided", score: 0 });
+      question.score = 0;
+      question.feedback = "No answer provided";
+      question.answer = "";
+
+      await interview.save();
+      return res.json({ feedback: question.feedback, score: 0 });
     }
 
     if (timeTaken > question.timeLimit) {
-      // PERFORMANCE OPTIMIZATION: Perform a direct atomic update using updateOne.
-      await Interview.updateOne(
-        { _id: interviewId },
-        {
-          $set: {
-            [`questions.${questionIndex}.score`]: 0,
-            [`questions.${questionIndex}.feedback`]: "Time limit exceeded",
-            [`questions.${questionIndex}.answer`]: answer,
-          }
-        }
-      );
-      return res.json({ feedback: "Time limit exceeded", score: 0 });
+      question.score = 0;
+      question.feedback = "Time limit exceeded";
+      question.answer = answer;
+
+      await interview.save();
+      return res.json({ feedback: question.feedback, score: 0 });
     }
 
     const message = [
@@ -366,61 +361,20 @@ export const submitAnswer = async (req, res) => {
         content: `
         Question:${question.question}
         Answer:${answer}
-        
         `,
       },
     ];
     const aiResponse = await askAi(message);
-    let parsedResponse;
-    try {
-      // Clean possible Markdown JSON code block fences
-      const cleaned = aiResponse
-        .replace(/^\s*```(?:json)?\s*/i, "")
-        .replace(/\s*```\s*$/i, "")
-        .trim();
-      parsedResponse = JSON.parse(cleaned);
-    } catch (parseErr) {
-      console.error("AI Evaluation JSON parse error:", parseErr, "Response was:", aiResponse);
-      return res.status(500).json({ message: "Failed to parse evaluation from AI." });
-    }
+    const parsedResponse = JSON.parse(aiResponse);
+    question.confidence = parsedResponse.confidence;
+    question.communication = parsedResponse.communication;
+    question.correctness = parsedResponse.correctness;
+    question.score = parsedResponse.finalScore;
+    question.feedback = parsedResponse.feedback;
+    question.answer = answer;
 
-    if (!parsedResponse || typeof parsedResponse !== "object") {
-      return res.status(500).json({ message: "Invalid evaluation response from AI." });
-    }
-
-    // Securely validate and clamp scores to ensure they are safe numbers within 0-10
-    const sanitizeScore = (val) => {
-      const num = Number(val);
-      if (isNaN(num)) return 0;
-      return Math.max(0, Math.min(10, Math.round(num)));
-    };
-
-    const confidence = sanitizeScore(parsedResponse.confidence);
-    const communication = sanitizeScore(parsedResponse.communication);
-    const correctness = sanitizeScore(parsedResponse.correctness);
-    const score = sanitizeScore(parsedResponse.finalScore);
-
-    // Sanitize feedback to prevent stored XSS attacks and limit to 500 characters
-    const rawFeedback = typeof parsedResponse.feedback === "string" ? parsedResponse.feedback : "";
-    const feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
-
-    // PERFORMANCE OPTIMIZATION: Perform a direct atomic update using updateOne
-    // instead of hydrated .save(), saving document overhead, bypassing change-tracking.
-    await Interview.updateOne(
-      { _id: interviewId },
-      {
-        $set: {
-          [`questions.${questionIndex}.confidence`]: confidence,
-          [`questions.${questionIndex}.communication`]: communication,
-          [`questions.${questionIndex}.correctness`]: correctness,
-          [`questions.${questionIndex}.score`]: score,
-          [`questions.${questionIndex}.feedback`]: feedback,
-          [`questions.${questionIndex}.answer`]: answer,
-        }
-      }
-    );
-
-    return res.status(200).json({ feedback, score });
+    await interview.save();
+    return res.status(200).json({ feedback: question.feedback, score: question.score });
   } catch (err) {
     console.log(err);
     return res.status(500).json({ message: "Failed to submit answer" });
@@ -435,9 +389,9 @@ export const finishInterview = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only the required 'userId' and 'questions' fields as a plain,
-    // lean object. This completely bypasses Mongoose model hydration, subdocument instantiation, and memory overhead.
-    const interview = await Interview.findById(interviewId).select("userId questions").lean();
+    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
+    // as it is not needed here, saving network bandwidth and memory overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText");
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
@@ -447,7 +401,7 @@ export const finishInterview = async (req, res) => {
     }
 
     const totalQuestion = interview.questions.length;
-   
+  
    let totalScore = 0;
    let totelConfidence=0;
    let totelCommunication=0;
@@ -472,33 +426,20 @@ export const finishInterview = async (req, res) => {
   const avgCorrectness = totelCorrectness
         ? totelCorrectness / totalQuestion
         : 0;
-        
-    // PERFORMANCE OPTIMIZATION: Perform a direct update via updateOne to write only modified fields.
-    // This avoids fully serializing, validating, and saving the entire heavy document back to the DB.
-    await Interview.updateOne(
-      { _id: interviewId },
-      { $set: { finalScore, status: "completed" } }
-    );
+       
+    interview.finalScore = finalScore;
+    interview.status = "completed";
+    await interview.save();
 
     return res.status(200).json({ 
       finalScore: Number(finalScore).toFixed(1),
       confidence: Number(avgConfidence).toFixed(1),
       communication: Number(avgCommunication).toFixed(1),
       correctness: Number(avgCorrectness).toFixed(1),
-      questionWiseScore: interview.questions.map((q)=>{
-        return {
-          question: q.question,
-          score: q.score || 0,
-          confidence: q.confidence || 0,
-          communication: q.communication || 0,
-          correctness: q.correctness || 0,
-          feedback: q.feedback || "",
-        }
-      })
+      totalQuestions: totalQuestion
     });
-
-  } catch (err) {
-    console.log(err);
+  } catch (error) {
+    console.error("Finish interview error:", error);
     return res.status(500).json({ message: "Failed to finish interview" });
   }
-}
+};
