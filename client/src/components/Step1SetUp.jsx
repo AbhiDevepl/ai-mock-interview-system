@@ -365,24 +365,41 @@ function Step1SetUp({ onStart }) {
               <label htmlFor="resume-upload-trigger" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Resume
               </label>
-              <button
-                id="resume-upload-trigger"
-                ref={uploadTriggerRef}
-                type="button"
-                onClick={() => setIsUploadOpen(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                  <FaFileUpload className="text-emerald-600" />
-                </span>
-                <span
-                  className={`truncate font-medium ${
-                    resumeFile ? "text-gray-800" : "text-gray-500"
-                  }`}
+              <div className="flex gap-2">
+                <button
+                  id="resume-upload-trigger"
+                  ref={uploadTriggerRef}
+                  type="button"
+                  onClick={() => setIsUploadOpen(true)}
+                  className="flex-1 flex items-center gap-3 px-4 py-3 border rounded-xl text-left cursor-pointer transition-colors border-gray-200 hover:border-emerald-500 hover:bg-emerald-50/60 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500"
                 >
-                  {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
-                </span>
-              </button>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
+                    <FaFileUpload className="text-emerald-600" />
+                  </span>
+                  <span
+                    className={`truncate font-medium ${
+                      resumeFile ? "text-gray-800" : "text-gray-500"
+                    }`}
+                  >
+                    {resumeFile ? resumeFile.name : "Upload Resume (Optional)"}
+                  </span>
+                </button>
+                {resumeFile && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setResumeFile(null);
+                      setAnalysisResult(null);
+                      setAnalysisStatus(null);
+                    }}
+                    aria-label="Remove selected resume"
+                    className="px-4 py-3 border border-red-200 hover:border-red-500 hover:bg-red-50 text-red-500 rounded-xl transition focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/25 flex items-center justify-center shrink-0 cursor-pointer"
+                  >
+                    <FaTimes size={18} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           {analysisStatus === "success" && analysisResult && (
@@ -540,18 +557,35 @@ function Step1SetUp({ onStart }) {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.02 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUploadResume();
-                      }}
-                      disabled={analyzing}
-                      className="mt-4 min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                    >
-                      {analyzing ? "Analyzing..." : "Analyze Resume"}
-                    </motion.button>
+                    <div className="flex justify-center gap-3 mt-4">
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUploadResume();
+                        }}
+                        disabled={analyzing}
+                        className="min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
+                      >
+                        {analyzing ? "Analyzing..." : "Analyze Resume"}
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResumeFile(null);
+                          setAnalysisResult(null);
+                          setAnalysisStatus(null);
+                        }}
+                        disabled={analyzing}
+                        aria-label="Remove selected resume file"
+                        className="min-h-[44px] bg-red-50 border border-red-200 hover:border-red-500 text-red-500 px-5 py-2.5 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 cursor-pointer"
+                      >
+                        Remove
+                      </motion.button>
+                    </div>
                   )}
                 </>
               )}
