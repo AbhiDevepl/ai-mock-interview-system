@@ -42,18 +42,18 @@ describe('Interview Controller Hardening & Validation', () => {
   beforeEach(async () => {
     await User.deleteMany({});
     await Interview.deleteMany({});
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'John Doe',
+      email: 'john@example.com',
+      credits: 100,
+      isActive: true,
+    });
     jest.clearAllMocks();
   });
 
   describe('POST /api/interview/generate-question', () => {
     it('should allow valid generation with standard inputs and map mode', async () => {
-      await User.create({
-        _id: '660000000000000000000001',
-        name: 'John Doe',
-        email: 'john@example.com',
-        credits: 100,
-      });
-
       mockAskAi.mockResolvedValue('Q1\nQ2\nQ3\nQ4\nQ5');
 
       const response = await request(app)
