@@ -31,3 +31,7 @@
 ## 2026-07-25 - Atomic Balance Updates and Concurrency Protection
 **Learning:** Performing state-changing operations (like credit deductions) using non-atomic patterns (`findOne`, check balance, `.save()`) is highly vulnerable to concurrent race conditions (double spending) and introduces substantial database round-trip overhead. Simply converting query objects to `.lean()` causes downstream `.save()` calls to fail.
 **Action:** Use `findOneAndUpdate` with query-level balance validation (e.g., `{ credits: { $gte: cost } }`) and `$inc` operators with `.lean()` to execute atomic balance modifications in a single efficient query.
+
+## 2026-07-28 - High-Performance Lean Positional Updates and Atomic Finish Workflows
+**Learning:** Mongoose hydrated `.save()` on heavy documents containing nested arrays degrades response times because of change-tracking and validation overhead on the entire array. Combining `.lean()` with custom positional object queries (`questions.${index}.field`) inside atomic `updateOne` calls completely skips hydration, array validation, and serialization. This optimizes CPU usage and database write size from O(N_array) to O(1) fields updated.
+**Action:** Utilize `.lean()` for retrieving documents that contain heavy nested arrays, and write modifications atomically using targeted positional paths via `updateOne`.
