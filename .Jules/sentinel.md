@@ -14,3 +14,8 @@
 **Vulnerability:** Under standard stateless token systems (like JWT-based auth used here), deactivating a user account in the database does not automatically invalidate active access tokens. As a result, deactivated users could still successfully query their profiles at the `/api/user/current-user` endpoint using their active cookies, bypassing access revocation.
 **Learning:** Over-reliance on stateless JWT signature verification without explicit database status checks on user-profile or metered endpoints allows deactivated or banned users to continue accessing resources until their tokens expire.
 **Prevention:** Always query the user status (`isActive === false`) on key profile and resource endpoints, and force-clear the authentication cookies (`token`, `refreshToken`, `deviceId`) on the response if a deactivated session is detected.
+
+## 2026-08-10 - Resource Consumption via Stateless Bypassed Deactivation
+**Vulnerability:** Bypassing explicit database user activation checks on AI-intensive, metered endpoints (`/api/interview/resume`, `/api/interview/generate-question`, and `/api/interview/submit-answer`) allowed deactivated accounts with active JWT sessions to exploit system resources and consume AI credits/third-party API budget before session expiration.
+**Learning:** Verification of the JWT token signature alone is insufficient for billing or metered services, where immediate access revocation must be guaranteed for deactivated, suspended, or deleted accounts.
+**Prevention:** Perform explicit database checks (`isActive !== false`) on all metered or AI-driven endpoints, securely delete temporary local resources (such as uploaded files via `fs.unlinkSync`) immediately upon rejection, and return a robust `403 Forbidden` status.
