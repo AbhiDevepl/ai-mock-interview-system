@@ -31,3 +31,7 @@
 ## 2026-07-25 - Atomic Balance Updates and Concurrency Protection
 **Learning:** Performing state-changing operations (like credit deductions) using non-atomic patterns (`findOne`, check balance, `.save()`) is highly vulnerable to concurrent race conditions (double spending) and introduces substantial database round-trip overhead. Simply converting query objects to `.lean()` causes downstream `.save()` calls to fail.
 **Action:** Use `findOneAndUpdate` with query-level balance validation (e.g., `{ credits: { $gte: cost } }`) and `$inc` operators with `.lean()` to execute atomic balance modifications in a single efficient query.
+
+## 2026-08-11 - Lazy Loading Below-the-Fold Landing Page Images
+**Learning:** Rendering multiple heavy visual assets (~1.3MB in total) synchronously on the initial load of the landing page increases the initial page load bundle weight, blocking CPU/network threads, and negatively impacting Time to Interactive (TTI). Employing native `loading="lazy"` on these below-the-fold image components defers image requests and decodes until they approach the viewport, dramatically saving initial loading bandwidth and boosting frontend rendering efficiency.
+**Action:** Always use native `loading="lazy"` for heavy below-the-fold landing page images to maximize visual loading performance.
