@@ -3,9 +3,11 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import User from '../models/user.model.js';
+import Interview from '../models/interview.model.js';
 import { jest } from '@jest/globals';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
+import { upload } from '../middleware/multer.js';
 
 // MOCKING FIREBASE BEFORE CONTROLLER IMPORT
 jest.unstable_mockModule('firebase-admin/app', () => ({
@@ -31,6 +33,7 @@ jest.unstable_mockModule('../config/token.js', () => ({
 // NOW IMPORT CONTROLLER
 const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, submitAnswer, analyzeResume } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(cookieParser());
@@ -41,6 +44,21 @@ app.get('/api/user/current-user', (req, res, next) => {
   next();
 }, getCurrentUser);
 app.post('/api/auth/refresh', refreshAuth);
+
+app.post('/api/interview/generate-question', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, generateQuestion);
+
+app.post('/api/interview/submit-answer', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, submitAnswer);
+
+app.post('/api/resume/analyze', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, upload.single('resume'), analyzeResume);
 
 let mongoServer;
 
@@ -255,5 +273,69 @@ describe('refreshAuth Controller hardening', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.message).toBe('Authentication required.');
+  });
+});
+
+describe('Metered endpoints deactivation hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    await Interview.deleteMany({});
+  });
+
+  it('should reject deactivated users in generateQuestion', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .set('x-user-id', user._id.toString())
+      .send({
+        role: 'Frontend Developer',
+        experience: '3 years',
+        mode: 'Technical',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users in submitAnswer', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/submit-answer')
+      .set('x-user-id', user._id.toString())
+      .send({
+        interviewId: new mongoose.Types.ObjectId().toString(),
+        questionIndex: 0,
+        answer: 'Test answer',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users in analyzeResume', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+    const response = await request(app)
+      .post('/api/resume/analyze')
+      .set('x-user-id', user._id.toString())
+      .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
   });
 });
