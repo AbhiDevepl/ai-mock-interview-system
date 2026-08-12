@@ -226,6 +226,7 @@ function Home() {
                       <img
                         src={item.img}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-auto object-contain max-h-64"
                       />
                     </div>
@@ -269,6 +270,7 @@ function Home() {
                       <img
                         src={item.img}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-auto object-contain max-h-48"
                       />
                     </div>

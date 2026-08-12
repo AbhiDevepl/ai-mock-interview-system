@@ -1,5 +1,9 @@
 # Bolt's Journal
 
+## 2026-08-12 - Below-the-Fold Landing Page Image Lazy Loading
+**Learning:** Landing pages often import and render heavy visual assets (e.g. ~1.3MB of images) in below-the-fold sections like features, capabilities, or modes. When loaded normally, these block the browser's main thread and defer critical Time to Interactive (TTI) metrics. Adding native `loading="lazy"` to these `<img>` elements ensures the browser only requests them when they scroll into viewport, greatly saving bandwidth and speeding up page responsiveness.
+**Action:** Always verify homepage and landing page image tags below the fold and apply native `loading="lazy"` to optimize initial paint metrics and resource usage.
+
 ## 2026-07-21 - Mongoose `.lean()` and ID Serialization Gotchas
 **Learning:** In Mongoose, using `.lean()` for read-only queries provides substantial performance benefits (typically 5x-10x speedup and significantly lower memory overhead) by skipping model hydration and returning plain objects. However, doing so bypasses schema-level transforms and virtual fields, such as converting `_id` to `id` (via `toJSON` or `toObject` transforms).
 **Action:** When optimizing with `.lean()`, always manually serialize the `id` field (`user.id = user._id.toString()`) if the client application or other downstream code expects it, to prevent silent API contract breaks.
