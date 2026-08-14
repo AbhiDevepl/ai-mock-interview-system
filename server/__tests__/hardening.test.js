@@ -3,6 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import User from '../models/user.model.js';
+import Interview from '../models/interview.model.js';
 import { jest } from '@jest/globals';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
@@ -28,9 +29,15 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
+// Mock Multer upload middleware
+import { upload } from '../middleware/multer.js';
+import fs from 'fs';
+import path from 'path';
+
 // NOW IMPORT CONTROLLER
 const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, analyzeResume, submitAnswer } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(cookieParser());
@@ -41,6 +48,16 @@ app.get('/api/user/current-user', (req, res, next) => {
   next();
 }, getCurrentUser);
 app.post('/api/auth/refresh', refreshAuth);
+
+// Helper test middleware to bind req.userId
+const mockIsAuth = (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+};
+
+app.post('/api/interview/generate-question', mockIsAuth, generateQuestion);
+app.post('/api/interview/resume', mockIsAuth, upload.single('resume'), analyzeResume);
+app.post('/api/interview/submit-answer', mockIsAuth, submitAnswer);
 
 let mongoServer;
 
@@ -158,6 +175,90 @@ describe('getCurrentUser Controller hardening', () => {
     expect(response.body.email).toBe('active@example.com');
     expect(response.body.isActive).toBeUndefined();
     expect(response.body.firebaseUID).toBeUndefined();
+  });
+});
+
+describe('Metered endpoints deactivation validation hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    await Interview.deleteMany({});
+    const directory = 'public';
+    if (fs.existsSync(directory)) {
+      const files = fs.readdirSync(directory);
+      for (const file of files) {
+        if (file !== '.gitkeep') {
+          fs.unlinkSync(path.join(directory, file));
+        }
+      }
+    }
+  });
+
+  it('should reject deactivated users on generateQuestion with 403', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+      credits: 100,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .set('x-user-id', user._id.toString())
+      .send({
+        role: 'Frontend Developer',
+        experience: '3 years',
+        mode: 'Behavioral',
+        projects: ['Project A'],
+        skills: ['React'],
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users on submitAnswer with 403', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/submit-answer')
+      .set('x-user-id', user._id.toString())
+      .send({
+        interviewId: new mongoose.Types.ObjectId().toString(),
+        questionIndex: 0,
+        answer: 'Valid answer',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users on analyzeResume with 403 and delete uploaded file', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+    const response = await request(app)
+      .post('/api/interview/resume')
+      .set('x-user-id', user._id.toString())
+      .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+
+    // Ensure public folder has no files left
+    const directory = 'public';
+    if (fs.existsSync(directory)) {
+      const files = fs.readdirSync(directory);
+      const uploadedPdfs = files.filter(f => f.endsWith('.pdf'));
+      expect(uploadedPdfs.length).toBe(0);
+    }
   });
 });
 
