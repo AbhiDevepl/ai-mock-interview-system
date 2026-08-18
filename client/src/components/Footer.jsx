@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { Link } from "react-router-dom";
 import { BsRobot, BsTwitterX, BsLinkedin, BsGithub, BsEnvelope } from "react-icons/bs";
 
 const navLinks = [
@@ -34,12 +35,16 @@ function Footer() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
           <div className="lg:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-black text-white p-2 rounded-lg">
+            <Link
+              to="/"
+              aria-label="InterviewIQ.AI - Back to Home"
+              className="inline-flex items-center gap-3 mb-4 cursor-pointer hover:bg-gray-100/80 rounded-xl p-1 -m-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 text-left"
+            >
+              <div className="bg-black text-white p-2 rounded-lg shrink-0">
                 <BsRobot size={18} />
               </div>
-              <span className="font-semibold text-base md:text-lg">InterviewIQ.AI</span>
-            </div>
+              <span className="font-semibold text-base md:text-lg text-gray-900">InterviewIQ.AI</span>
+            </Link>
             <p className="text-gray-500 text-sm leading-relaxed">
               AI Powered Mock Interview System
             </p>
