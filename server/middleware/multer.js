@@ -1,6 +1,12 @@
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
+import fs from "fs";
+
+// Ensure upload directory exists at module load time to avoid blocking request event loop
+if (!fs.existsSync("public")) {
+  fs.mkdirSync("public", { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {

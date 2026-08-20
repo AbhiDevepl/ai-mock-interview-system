@@ -31,6 +31,8 @@ jest.unstable_mockModule('../config/token.js', () => ({
 // NOW IMPORT CONTROLLER
 const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
+const { upload } = await import('../middleware/multer.js');
 
 const app = express();
 app.use(cookieParser());
@@ -41,6 +43,14 @@ app.get('/api/user/current-user', (req, res, next) => {
   next();
 }, getCurrentUser);
 app.post('/api/auth/refresh', refreshAuth);
+app.post('/api/interview/generate-question', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, generateQuestion);
+app.post('/api/interview/resume', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, upload.single('resume'), analyzeResume);
 
 let mongoServer;
 
@@ -255,5 +265,50 @@ describe('refreshAuth Controller hardening', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.message).toBe('Authentication required.');
+  });
+});
+
+describe('Metered Interview Endpoints Deactivation hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should reject generateQuestion for deactivated users', async () => {
+    const deactivatedUser = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated-questions@example.com',
+      isActive: false,
+      credits: 100,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .set('x-user-id', deactivatedUser._id.toString())
+      .send({
+        role: 'Software Engineer',
+        experience: '2 years',
+        mode: 'Technical',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject analyzeResume for deactivated users', async () => {
+    const deactivatedUser = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated-resume@example.com',
+      isActive: false,
+    });
+
+    const pdfBuffer = Buffer.from('%PDF-1.4 dummy pdf content');
+
+    const response = await request(app)
+      .post('/api/interview/resume')
+      .set('x-user-id', deactivatedUser._id.toString())
+      .attach('resume', pdfBuffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
   });
 });
