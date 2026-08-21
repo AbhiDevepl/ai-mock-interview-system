@@ -29,3 +29,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-03-03 - Header Brand Logo Accessibility & Navigation semantics
 **Learning:** Interactive branding logos are often built as non-semantic layout elements with custom click listeners but without keyboard focus support, focus rings, hover styles, or screen-reader labels. Converting these branding wrappers into semantic `<button>` elements with exact routing navigation, transition hover highlights, negative-margin compensations, and unique focus rings significantly enhances screen-reader usability.
 **Action:** When designing header and footer brand logo links, convert them into semantic button or link tags, provide distinct hover transitions, compensate padding spacing with negative margins, and add high-contrast focus indicators (`focus-visible:ring-2`) and descriptive `aria-label` tags.
+
+## 2025-03-04 - Timer ARIA & Dynamic Warning States
+**Learning:** Timer and progress indicators without explicit timer roles or live region announcements leave screen readers completely unaware of ticking updates. Additionally, using static warning colors (e.g. constant red text) when ample time remains causes visual fatigue and confusion.
+**Action:** Wrap countdown indicators with `role="timer"`, `aria-live="polite"`, dynamic `aria-valuenow`/`min`/`max` attributes, and an `aria-label` describing remaining time, while transitioning text and path colors to warning hues only when remaining time crosses a low threshold.
