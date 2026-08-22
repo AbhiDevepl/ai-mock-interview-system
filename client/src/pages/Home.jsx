@@ -152,7 +152,7 @@ function Home() {
                 }}
                 whileHover={{ opacity: 0.9, scale: 1.03 }}
                 whileTap={{ opacity: 1, scale: 0.98 }}
-                className="bg-black text-white px-10 py-3 rounded-full hover:opacity-90 transition shadow-md"
+                className="bg-black text-white px-10 py-3 rounded-full hover:opacity-90 transition shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
               >
                 Start Interview
               </motion.button>
@@ -166,7 +166,7 @@ function Home() {
                 }}
                 whileHover={{ opacity: 0.9, scale: 1.03 }}
                 whileTap={{ opacity: 1, scale: 0.98 }}
-                className="border border-gray-300 px-10 py-3 rounded-full hover:bg-gray-100 transition"
+                className="border border-gray-300 px-10 py-3 rounded-full hover:bg-gray-100 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
               >
                 View History
               </motion.button>
