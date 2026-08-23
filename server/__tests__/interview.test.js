@@ -45,7 +45,47 @@ describe('Interview Controller Hardening & Validation', () => {
     jest.clearAllMocks();
   });
 
+  describe('POST /api/interview/resume', () => {
+    it('should reject deactivated users and cleanup uploaded file', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'John Doe',
+        email: 'john@example.com',
+        isActive: false,
+      });
+
+      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      const response = await request(app)
+        .post('/api/interview/resume')
+        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+  });
+
   describe('POST /api/interview/generate-question', () => {
+    it('should reject deactivated users', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'John Doe',
+        email: 'john@example.com',
+        credits: 100,
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .send({
+          role: 'Frontend Developer',
+          experience: '3 years',
+          mode: 'Technical',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
     it('should allow valid generation with standard inputs and map mode', async () => {
       await User.create({
         _id: '660000000000000000000001',
