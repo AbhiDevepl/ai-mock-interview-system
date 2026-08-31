@@ -52,10 +52,10 @@ function Footer() {
                 <li key={link.href}>
                   <a
                     href={link.href}
-                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-emerald-600 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                   >
                     {link.label}
-                    <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-green-600 transition-all duration-200 group-hover:w-full" />
+                    <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-emerald-600 transition-all duration-200 group-hover:w-full" />
                   </a>
                 </li>
               ))}
@@ -69,10 +69,10 @@ function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-emerald-600 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                   >
                     {link.label}
-                    <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-green-600 transition-all duration-200 group-hover:w-full" />
+                    <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-emerald-600 transition-all duration-200 group-hover:w-full" />
                   </a>
                 </li>
               ))}
@@ -88,7 +88,7 @@ function Footer() {
                   href={social.href}
                   whileHover={{ scale: 1.08 }}
                   whileTap={{ scale: 0.95 }}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
                   aria-label={social.label}
                 >
                   <social.icon size={18} />
@@ -107,7 +107,7 @@ function Footer() {
               <a
                 key={link.label}
                 href={link.href}
-                className="text-gray-500 text-sm hover:text-green-600 transition-colors"
+                className="text-gray-500 text-sm hover:text-emerald-600 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
                 {link.label}
               </a>
