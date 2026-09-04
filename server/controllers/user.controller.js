@@ -17,51 +17,25 @@ export const getCurrentUser = async (req, res) => {
       console.error(`User not found for ID: ${userId}`);
       return res.status(401).json({ message: "Authentication required." });
     }
-    if (user.isActive === false) {
-      res.clearCookie("token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        path: "/",
-      });
-      return res.status(401).json({ message: "This account has been deactivated." });
-    }
-    if (user.isActive === false) {
-      console.error(`User account is deactivated: ${userId}`);
-      res.clearCookie("token", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        path: "/",
-      });
-      return res.status(401).json({ message: "Authentication required." });
-    }
 
-    // Security check: if user is deactivated, block access and clear cookies
     if (user.isActive === false) {
-      console.error(`Deactivated user access attempt: userId=${userId}`);
       const isProduction = process.env.NODE_ENV === "production";
-      const COOKIE_OPTIONS = {
+      res.clearCookie("token", {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
         path: "/",
-      };
-      res.clearCookie("token", COOKIE_OPTIONS);
-      res.clearCookie("refreshToken", COOKIE_OPTIONS);
-      res.clearCookie("deviceId", COOKIE_OPTIONS);
+      });
+      console.error(`Attempt to access getCurrentUser from deactivated user: ${userId}`);
       return res.status(401).json({ message: "Authentication required." });
     }
-
-    // Exclude isActive from client payload for security/minimalism
-    delete user.isActive;
 
     // Manually serialize id since Mongoose toJSON transform won't run on lean objects
     user.id = user._id.toString();
     delete user.isActive;
     return res.status(200).json(user);
   } catch (error) {
-    console.error("Get current user error:", error);
+    console.error("Failed to get current user:", error.message);
     return res.status(500).json({ message: "Internal server error." });
   }
 };
