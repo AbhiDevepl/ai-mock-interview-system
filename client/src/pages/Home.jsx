@@ -223,9 +223,12 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center">
                     <div className="w-full md:w-1/2 flex justify-center">
+                      {/* PERFORMANCE OPTIMIZATION: Use native loading="lazy" for below-the-fold capabilities images
+                          to prevent fetching heavy visual assets on initial render, saving bandwidth and TTI. */}
                       <img
                         src={item.img}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-auto object-contain max-h-64"
                       />
                     </div>
@@ -266,9 +269,12 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center gap-6">
                     <div className="w-full md:w-1/2 flex justify-center">
+                      {/* PERFORMANCE OPTIMIZATION: Use native loading="lazy" for below-the-fold interview mode images
+                          to improve Time to Interactive (TTI) and avoid initial load request overhead. */}
                       <img
                         src={item.img}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-auto object-contain max-h-48"
                       />
                     </div>
