@@ -8,7 +8,6 @@ import NavBar from "./components/NavBar";
 import Footer from "./components/Footer";
 import { setUserData } from "./redux/userSlice";
 import InterviewPage from "./pages/InterviewPage.jsx";
-
 const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
 
 function App() {
