@@ -22,12 +22,13 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    // Harden: Enforce account deactivation checks on AI endpoints to prevent unauthorized resource consumption
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      if (filepath && fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
+    const user = await User.findById(req.userId).select("isActive").lean();
+    if (!user) {
+      if (filepath && fs.existsSync(filepath)) fs.unlinkSync(filepath);
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.isActive === false) {
+      if (filepath && fs.existsSync(filepath)) fs.unlinkSync(filepath);
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
