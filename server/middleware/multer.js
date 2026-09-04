@@ -4,14 +4,15 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import fs from "fs";
 
+// Ensure the target upload directory exists to prevent ENOENT errors during file upload
 const uploadDir = "public";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, uploadDir)
   },
   filename: function (req, file, cb) {
     // Extract base filename to prevent path traversal vulnerability (e.g. ../../traversal.pdf)
