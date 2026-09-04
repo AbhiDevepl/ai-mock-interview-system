@@ -57,7 +57,7 @@ function Footer() {
                 <li key={link.href}>
                   <a
                     href={link.href}
-                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded"
                   >
                     {link.label}
                     <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-emerald-600 transition-all duration-200 group-hover:w-full" />
@@ -74,7 +74,7 @@ function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded"
                   >
                     {link.label}
                     <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-emerald-600 transition-all duration-200 group-hover:w-full" />
@@ -115,7 +115,7 @@ function Footer() {
               <a
                 key={link.label}
                 href={link.href}
-                className="text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md"
+                className="text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded"
               >
                 {link.label}
               </a>
