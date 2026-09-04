@@ -21,19 +21,13 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    // Harden: Ensure requesting user is active before processing metered upload
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (!requestUser) {
+    // Verify user account is active before performing AI metered operations
+    const user = await User.findById(req.userId).select("isActive").lean();
+    if (!user || user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
-      return res.status(404).json({ message: "User not found" });
-    }
-    if (requestUser.isActive === false) {
-      if (filepath && fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-      return res.status(403).json({ message: "Forbidden: Account is deactivated." });
+      return res.status(403).json({ message: "This account has been deactivated." });
     }
 
     const fileBuffer = await fs.promises.readFile(filepath);
@@ -139,27 +133,16 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
-    // before calling the expensive AI service. This avoids fetching and hydrating
-    // unused fields, saving database bandwidth and server memory, and avoids
-    // AI calls for users with insufficient credits.
-    const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
-    if (!userPreCheck) {
-      return res.status(404).json({ message: "User not found." });
+    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
+    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits isActive");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-    if (userPreCheck.isActive === false) {
+    if (user.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
-    if (userPreCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-    if (userPreCheck.isActive === false) {
-      return res.status(403).json({ message: "Forbidden: Account is deactivated." });
-    }
-    if (userPreCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-    if (userPreCheck.credits < 50) {
+    if (user.credits < 50) {
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
