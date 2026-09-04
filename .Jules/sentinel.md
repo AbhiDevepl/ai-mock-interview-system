@@ -10,7 +10,7 @@
 **Learning:** Wrapping parameter verification inside a block that converts any caught error into a different exception can mask critical validation bugs and make tests/logic brittle.
 **Prevention:** Always set a strict timeout (e.g., 15000 ms) on external HTTP requests and ensure validation logic either sits outside the general `try-catch` block or has its errors explicitly bypassed so they are not swallowed.
 
-## 2026-08-09 - Stateless Session Deactivation Deficit
-**Vulnerability:** Under standard stateless token systems (like JWT-based auth used here), deactivating a user account in the database does not automatically invalidate active access tokens. As a result, deactivated users could still successfully query their profiles at the `/api/user/current-user` endpoint using their active cookies, bypassing access revocation.
-**Learning:** Over-reliance on stateless JWT signature verification without explicit database status checks on user-profile or metered endpoints allows deactivated or banned users to continue accessing resources until their tokens expire.
-**Prevention:** Always query the user status (`isActive === false`) on key profile and resource endpoints, and force-clear the authentication cookies (`token`, `refreshToken`, `deviceId`) on the response if a deactivated session is detected.
+## 2026-08-08 - Client-Side Authentication Bypass on Account Deactivation
+**Vulnerability:** User deactivation bypass via read-only user query endpoint. Deactivated users possessing a valid token could still load their profile details from the `GET /api/user/current-user` endpoint and successfully authenticate on the React client. This occurred because the controller excluded the `isActive` attribute from the database query projection and lacked account status validation.
+**Learning:** Protecting only login/registration and AI endpoints against deactivated accounts is insufficient. Any endpoint that returns current user details to bootstrap client-side state is a critical authentication vector and must explicitly verify status.
+**Prevention:** Always include `isActive` in user profile query projections, and return 401 Unauthorized while explicitly clearing all session cookies (`token`, `refreshToken`, `deviceId`) if `isActive === false`.
