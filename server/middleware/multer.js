@@ -3,14 +3,12 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import fs from "fs";
 
-// Ensure destination directory exists to prevent ENOENT errors during file upload
-const uploadDir = "public";
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    const uploadDir = "public";
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
