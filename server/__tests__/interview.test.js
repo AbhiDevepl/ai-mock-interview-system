@@ -112,6 +112,83 @@ describe('Interview Controller Hardening & Validation', () => {
     });
   });
 
+  describe('Account Deactivation Checks', () => {
+    it('should reject generate-question if user is deactivated', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'inactive@example.com',
+        credits: 100,
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .send({
+          role: 'Frontend Developer',
+          experience: '3 years',
+          mode: 'Behavioral',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
+    it('should reject submit-answer if user is deactivated', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'inactive@example.com',
+        isActive: false,
+      });
+
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
+      });
+
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .send({
+          interviewId: interview._id,
+          questionIndex: 0,
+          answer: 'Test answer',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
+    it('should reject finish if user is deactivated', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'inactive@example.com',
+        isActive: false,
+      });
+
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
+      });
+
+      const response = await request(app)
+        .post('/api/interview/finish')
+        .send({
+          interviewId: interview._id,
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+  });
+
   describe('POST /api/interview/generate-question', () => {
     it('should reject deactivated users', async () => {
       await User.create({
