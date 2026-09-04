@@ -326,7 +326,8 @@ export const submitAnswer = async (req, res) => {
 
     // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
     // as it is not needed here, saving network bandwidth and memory overhead.
-    const interview = await Interview.findById(interviewId).select("-resumeText");
+    // Also use .lean() to bypass document hydration overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText").lean();
 
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
@@ -392,21 +393,27 @@ export const submitAnswer = async (req, res) => {
     }
 
     if (!answer) {
-      question.score = 0;
-      question.feedback = "No answer provided";
-      question.answer = "";
+      // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
+      // instead of hydrated save to skip Mongoose's full array tracking and validations.
+      const updateQuery = {};
+      updateQuery[`questions.${questionIndex}.score`] = 0;
+      updateQuery[`questions.${questionIndex}.feedback`] = "No answer provided";
+      updateQuery[`questions.${questionIndex}.answer`] = "";
 
-      await interview.save();
-      return res.json({ feedback: question.feedback, score: 0 });
+      await Interview.updateOne({ _id: interviewId }, { $set: updateQuery });
+      return res.json({ feedback: "No answer provided", score: 0 });
     }
 
     if (timeTaken > question.timeLimit) {
-      question.score = 0;
-      question.feedback = "Time limit exceeded";
-      question.answer = answer;
+      // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
+      // instead of hydrated save to skip Mongoose's full array tracking and validations.
+      const updateQuery = {};
+      updateQuery[`questions.${questionIndex}.score`] = 0;
+      updateQuery[`questions.${questionIndex}.feedback`] = "Time limit exceeded";
+      updateQuery[`questions.${questionIndex}.answer`] = answer;
 
-      await interview.save();
-      return res.json({ feedback: question.feedback, score: 0 });
+      await Interview.updateOne({ _id: interviewId }, { $set: updateQuery });
+      return res.json({ feedback: "Time limit exceeded", score: 0 });
     }
 
     const message = [
@@ -493,14 +500,17 @@ export const submitAnswer = async (req, res) => {
     const rawFeedback = typeof parsedResponse.feedback === "string" ? parsedResponse.feedback : "";
     const feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
 
-    question.confidence = confidence;
-    question.communication = communication;
-    question.correctness = correctness;
-    question.score = score;
-    question.feedback = feedback;
-    question.answer = answer;
+    // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
+    // instead of hydrated save to skip Mongoose's full array tracking and validations.
+    const updateQuery = {};
+    updateQuery[`questions.${questionIndex}.confidence`] = confidence;
+    updateQuery[`questions.${questionIndex}.communication`] = communication;
+    updateQuery[`questions.${questionIndex}.correctness`] = correctness;
+    updateQuery[`questions.${questionIndex}.score`] = score;
+    updateQuery[`questions.${questionIndex}.feedback`] = feedback;
+    updateQuery[`questions.${questionIndex}.answer`] = answer;
 
-    await interview.save();
+    await Interview.updateOne({ _id: interviewId }, { $set: updateQuery });
     return res.status(200).json({ feedback, score });
   } catch (err) {
     console.log(err);
@@ -521,12 +531,9 @@ export const finishInterview = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Fetch only necessary fields and use .lean() to
-    // completely bypass Mongoose model hydration and document track-change overhead.
-    const interview = await Interview.findById(interviewId)
-      .select("userId questions")
-      .lean();
-
+    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
+    // and use .lean() to completely bypass Mongoose document hydration overhead.
+    const interview = await Interview.findById(interviewId).select("-resumeText").lean();
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
@@ -562,8 +569,8 @@ export const finishInterview = async (req, res) => {
           ? totelCorrectness / totalQuestion
           : 0;
        
-    // PERFORMANCE OPTIMIZATION: Update status and finalScore using a targeted
-    // atomic updateOne operation instead of heavy hydrated document.save().
+    // PERFORMANCE OPTIMIZATION: Persist updates atomically via updateOne to skip
+    // full serialization and Mongoose document validation overhead.
     await Interview.updateOne(
       { _id: interviewId },
       { $set: { finalScore, status: "complete" } }
