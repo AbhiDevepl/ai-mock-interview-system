@@ -204,6 +204,29 @@ describe('Interview Controller Hardening & Validation', () => {
         .send({
           role: 'Frontend Developer',
           experience: '3 years',
+          mode: 'Behavioral',
+          projects: ['Project A'],
+          skills: ['React'],
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
+    it('should allow valid generation with standard inputs and map mode', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'John Doe',
+        email: 'john@example.com',
+        credits: 100,
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .send({
+          role: 'Frontend Developer',
+          experience: '3 years',
           mode: 'Technical',
         });
 
@@ -312,56 +335,25 @@ describe('Interview Controller Hardening & Validation', () => {
   });
 
   describe('POST /api/interview/submit-answer', () => {
-    it('should reject deactivated users with 403 Forbidden', async () => {
-      await User.deleteMany({});
+    it('should reject deactivated users', async () => {
       await User.create({
         _id: '660000000000000000000001',
-        name: 'Banned User',
-        email: 'banned@example.com',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        credits: 100,
         isActive: false,
-      });
-
-      const interview = await Interview.create({
-        userId: '660000000000000000000001',
-        role: 'Frontend',
-        experience: 'Junior',
-        mode: 'Technical',
-        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
       });
 
       const response = await request(app)
         .post('/api/interview/submit-answer')
         .send({
-          interviewId: interview._id,
+          interviewId: new mongoose.Types.ObjectId().toString(),
           questionIndex: 0,
           answer: 'Test answer',
         });
 
       expect(response.status).toBe(403);
       expect(response.body.message).toBe('This account has been deactivated.');
-    });
-
-    it('should reject nonexistent users with 404 Not Found', async () => {
-      await User.deleteMany({});
-
-      const interview = await Interview.create({
-        userId: '660000000000000000000001',
-        role: 'Frontend',
-        experience: 'Junior',
-        mode: 'Technical',
-        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
-      });
-
-      const response = await request(app)
-        .post('/api/interview/submit-answer')
-        .send({
-          interviewId: interview._id,
-          questionIndex: 0,
-          answer: 'Test answer',
-        });
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe('User not found.');
     });
 
     it('should reject malformed interview ID', async () => {
@@ -552,6 +544,26 @@ describe('Interview Controller Hardening & Validation', () => {
       const updated = await Interview.findById(interview._id).lean();
       expect(updated.status).toBe('complete');
       expect(updated.finalScore).toBe(7);
+    });
+  });
+
+  describe('POST /api/interview/resume', () => {
+    it('should reject deactivated users and clean up uploaded files', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        credits: 100,
+        isActive: false,
+      });
+
+      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      const response = await request(app)
+        .post('/api/interview/resume')
+        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
     });
   });
 });

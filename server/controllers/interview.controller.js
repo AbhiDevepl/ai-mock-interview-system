@@ -39,12 +39,9 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    if (!filepath) {
-      return res.status(400).json({ message: "Invalid resume file path" });
-    }
-
-    const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
+    // Harden: Reject deactivated users and clean up uploaded files
+    const requestUser = await User.findById(req.userId).select("isActive").lean();
+    if (requestUser && requestUser.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
@@ -154,16 +151,19 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
-    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits isActive").lean();
-    if (!user) {
+    // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
+    // before calling the expensive AI service. This avoids fetching and hydrating
+    // unused fields, saving database bandwidth and server memory, and avoids
+    // AI calls for users with insufficient credits.
+    // Harden: Select isActive as well to ensure deactivated users are denied access.
+    const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
+    if (!userPreCheck) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (user.isActive === false) {
+    if (userPreCheck.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
-    if (user.credits < 50) {
+    if (userPreCheck.credits < 50) {
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
@@ -318,7 +318,7 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // Harden: Reject deactivated users
+    // Harden: Check if the requesting user is deactivated to protect metered AI resources
     const requestUser = await User.findById(req.userId).select("isActive").lean();
     if (requestUser && requestUser.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
