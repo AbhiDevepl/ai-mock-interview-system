@@ -71,41 +71,47 @@ function Step1SetUp({ onStart }) {
     setAnalysisError("");
   };
 
+  const modalRef = React.useRef(null);
+  const previousFocusRef = React.useRef(null);
+
   React.useEffect(() => {
     if (!isUploadOpen) return;
+    previousFocusRef.current = document.activeElement;
 
-    // Shift focus to the close button inside the modal when it opens
-    if (closeBtnRef.current) {
-      closeBtnRef.current.focus();
-    }
+    setTimeout(() => {
+      if (modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length > 0) {
+          focusables[0].focus();
+        }
+      }
+    }, 50);
 
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         closeUploadModal();
         return;
       }
-
-      if (e.key === "Tab") {
-        if (!modalRef.current) return;
-        // Find all focusable elements inside the modal
-        const focusableElements = modalRef.current.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      if (e.key === "Tab" && modalRef.current) {
+        const focusables = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
         );
-        if (focusableElements.length === 0) return;
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
 
         if (e.shiftKey) {
-          // Shift + Tab: if on the first element, wrap to the last
-          if (document.activeElement === firstElement) {
-            lastElement.focus();
+          if (document.activeElement === first) {
+            last.focus();
             e.preventDefault();
           }
         } else {
-          // Tab: if on the last element, wrap to the first
-          if (document.activeElement === lastElement) {
-            firstElement.focus();
+          if (document.activeElement === last) {
+            first.focus();
             e.preventDefault();
           }
         }
@@ -117,9 +123,8 @@ function Step1SetUp({ onStart }) {
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      // Restore focus to the trigger button when the modal closes
-      if (currentTrigger) {
-        currentTrigger.focus();
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
       }
     };
   }, [isUploadOpen]);
@@ -471,6 +476,7 @@ function Step1SetUp({ onStart }) {
           onClick={closeUploadModal}
         >
           <motion.div
+            ref={modalRef}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.25 }}
