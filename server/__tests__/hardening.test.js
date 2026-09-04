@@ -5,9 +5,11 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
+import Interview from '../models/interview.model.js';
 import { jest } from '@jest/globals';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
+import { upload } from '../middleware/multer.js';
 
 // Set test environment secret
 process.env.JWT_SECRET = 'test-secret';
@@ -40,8 +42,9 @@ import path from 'path';
 import fs from 'fs';
 
 // NOW IMPORT CONTROLLER
-const { googleAuth } = await import('../controllers/auth.controller.js');
-const interviewRouter = (await import('../routers/interview.route.js')).default;
+const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
+const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, submitAnswer, analyzeResume } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(cookieParser());
@@ -60,6 +63,21 @@ app.use((err, req, res, next) => {
   }
   return res.status(500).json({ message: "Internal server error." });
 });
+
+app.post('/api/interview/generate-question', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, generateQuestion);
+
+app.post('/api/interview/submit-answer', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, submitAnswer);
+
+app.post('/api/resume/analyze', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, upload.single('resume'), analyzeResume);
 
 let mongoServer;
 
@@ -217,6 +235,167 @@ describe('Interview Endpoints hardening for deactivated users', () => {
         answer: 'Valid answer',
         timeTaken: 10,
       });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+});
+
+describe('refreshAuth Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  it('should successfully rotate tokens for active users', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const refreshToken = jwt.sign(
+      { userId: user._id.toString(), type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+
+    // Should set rotated token cookies
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=mock-access-token'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=mock-refresh-token'))).toBe(true);
+  });
+
+  it('should reject and clear cookies for deactivated users', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'inactive@example.com',
+      isActive: false,
+    });
+
+    const refreshToken = jwt.sign(
+      { userId: user._id.toString(), type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Cookies should be cleared
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+  });
+
+  it('should reject and clear cookies for non-existent users', async () => {
+    const nonExistentId = new mongoose.Types.ObjectId().toString();
+    const refreshToken = jwt.sign(
+      { userId: nonExistentId, type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Cookies should be cleared
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+  });
+
+  it('should reject if invalid type token is provided', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const invalidTypeToken = jwt.sign(
+      { userId: user._id.toString(), type: 'access' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${invalidTypeToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+  });
+});
+
+describe('Metered endpoints deactivation hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    await Interview.deleteMany({});
+  });
+
+  it('should reject deactivated users in generateQuestion', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .set('x-user-id', user._id.toString())
+      .send({
+        role: 'Frontend Developer',
+        experience: '3 years',
+        mode: 'Technical',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users in submitAnswer', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/submit-answer')
+      .set('x-user-id', user._id.toString())
+      .send({
+        interviewId: new mongoose.Types.ObjectId().toString(),
+        questionIndex: 0,
+        answer: 'Test answer',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users in analyzeResume', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+    const response = await request(app)
+      .post('/api/resume/analyze')
+      .set('x-user-id', user._id.toString())
+      .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
 
     expect(response.status).toBe(403);
     expect(response.body.message).toBe('This account has been deactivated.');
