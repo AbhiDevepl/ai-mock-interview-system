@@ -36,7 +36,8 @@ jest.unstable_mockModule('../config/token.js', () => ({
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
-const { generateQuestion, submitAnswer, analyzeResume } = await import('../controllers/interview.controller.js');
+const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
+const { upload } = await import('../middleware/multer.js');
 
 const app = express();
 app.use(cookieParser());
@@ -54,18 +55,15 @@ app.get('/api/user/current-user', (req, res, next) => {
   req.userId = req.headers['x-user-id'];
   next();
 }, getCurrentUser);
+app.post('/api/auth/refresh', refreshAuth);
 app.post('/api/interview/generate-question', (req, res, next) => {
-  req.userId = req.headers['x-user-id'];
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
   next();
 }, generateQuestion);
-app.post('/api/interview/submit-answer', (req, res, next) => {
-  req.userId = req.headers['x-user-id'];
-  next();
-}, submitAnswer);
 app.post('/api/interview/resume', (req, res, next) => {
-  req.userId = req.headers['x-user-id'];
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
   next();
-}, analyzeResume);
+}, upload.single('resume'), analyzeResume);
 
 let mongoServer;
 
@@ -197,5 +195,147 @@ describe('Deactivated user restriction across endpoints', () => {
       .set('x-user-id', deactivatedUser._id.toString());
 
     expect(response.status).toBe(400); // Because req.file check happens first
+  });
+});
+
+describe('refreshAuth Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  it('should successfully rotate tokens for active users', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const refreshToken = jwt.sign(
+      { userId: user._id.toString(), type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+
+    // Should set rotated token cookies
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=mock-access-token'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=mock-refresh-token'))).toBe(true);
+  });
+
+  it('should reject and clear cookies for deactivated users', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'inactive@example.com',
+      isActive: false,
+    });
+
+    const refreshToken = jwt.sign(
+      { userId: user._id.toString(), type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Cookies should be cleared
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+  });
+
+  it('should reject and clear cookies for non-existent users', async () => {
+    const nonExistentId = new mongoose.Types.ObjectId().toString();
+    const refreshToken = jwt.sign(
+      { userId: nonExistentId, type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Cookies should be cleared
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+  });
+
+  it('should reject if invalid type token is provided', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const invalidTypeToken = jwt.sign(
+      { userId: user._id.toString(), type: 'access' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${invalidTypeToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+  });
+});
+
+describe('Metered Interview Endpoints Deactivation hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  it('should reject generateQuestion for deactivated users', async () => {
+    const deactivatedUser = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated-questions@example.com',
+      isActive: false,
+      credits: 100,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .set('x-user-id', deactivatedUser._id.toString())
+      .send({
+        role: 'Software Engineer',
+        experience: '2 years',
+        mode: 'Technical',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject analyzeResume for deactivated users', async () => {
+    const deactivatedUser = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated-resume@example.com',
+      isActive: false,
+    });
+
+    const pdfBuffer = Buffer.from('%PDF-1.4 dummy pdf content');
+
+    const response = await request(app)
+      .post('/api/interview/resume')
+      .set('x-user-id', deactivatedUser._id.toString())
+      .attach('resume', pdfBuffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
   });
 });
