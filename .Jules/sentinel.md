@@ -5,7 +5,7 @@
 **Learning:** Although `jsonwebtoken` prevents `none` by default in newer versions, explicitly restricting verification to a whitelist of symmetric algorithms (such as `["HS256"]`) is essential to prevent signature verification bypass when symmetric and asymmetric keys are mixed or potentially compromised.
 **Prevention:** Always specify the `algorithms` array parameter in JWT validation middleware options to explicitly whitelist acceptable algorithms.
 
-## 2026-03-31 - Missing Account Deactivation Enforcement on API and Session Retrieval Endpoints
-**Vulnerability:** Incomplete account deactivation enforcement where deactivated users (`isActive: false`) could still retrieve user details and perform metered, resource-intensive operations (such as PDF resume analysis and question generation utilizing Groq API) as long as they possessed a valid, unexpired session JWT.
-**Learning:** Checking account status strictly during the authentication/login flow is insufficient if JWT tokens have long lifespans (e.g. 7 days). Session verification endpoints (`getCurrentUser`) and high-impact or costly API handlers must perform active, stateful checks on the database to ensure the requesting user's account is still active.
-**Prevention:** Always retrieve and validate the active state (`user.isActive`) from the database on session bootstrap/retrieval endpoints and sensitive, metered resource routes.
+## 2026-03-30 - Deactivated User Metered AI Abuse
+**Vulnerability:** Lack of deactivation checks in metered/expensive AI endpoints (`generateQuestion`, `analyzeResume`) and `/api/user/current-user`. Although login/authentication endpoints checked `isActive` status, deactivated users with active valid tokens could still abuse metered AI APIs and maintain client-side session context.
+**Learning:** Authentication checks must occur at every resource access point when dealing with high-cost or state-sensitive resources. Relying solely on login-time verification or JWT existence creates a significant time-of-check to time-of-use (TOCTOU) gap during user deactivation.
+**Prevention:** Always verify user deactivation/active status against the database for high-cost metered API calls and bootstrap endpoints. Clean up uploaded user resources (e.g., uploaded files) if the request is rejected due to account deactivation.

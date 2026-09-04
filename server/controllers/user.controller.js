@@ -30,12 +30,19 @@ export const getCurrentUser = async (req, res) => {
       res.clearCookie("refreshToken", COOKIE_OPTIONS);
       return res.status(401).json({ message: "Authentication required." });
     }
+
+    if (user.isActive === false) {
+      console.error(`Deactivated user access attempt: ${userId}`);
+      res.clearCookie("token", COOKIE_OPTIONS);
+      return res.status(401).json({ message: "Authentication required." });
+    }
+
     // Manually serialize id since Mongoose toJSON transform won't run on lean objects
     user.id = user._id.toString();
-    delete user.isActive;
+    delete user.isActive; // Remove internal field before sending to client
     return res.status(200).json(user);
   } catch (error) {
-    console.error("GetCurrentUser error:", error.message);
+    console.error("Get current user error:", error);
     return res.status(500).json({ message: "Internal server error." });
   }
 };

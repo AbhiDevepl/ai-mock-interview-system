@@ -1,12 +1,30 @@
 import fs from "fs";
+import path from "path";
 import mongoose from "mongoose";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { askAi } from "../services/openRouter.service.js";
 import Interview from "../models/interview.model.js";
 import User from "../models/user.model.js";
 
+const UPLOAD_ROOT = path.resolve(process.cwd(), "uploads");
+
+const getSafeUploadPath = (inputPath) => {
+  if (!inputPath || typeof inputPath !== "string") return null;
+
+  const resolvedPath = path.isAbsolute(inputPath)
+    ? path.resolve(inputPath)
+    : path.resolve(UPLOAD_ROOT, inputPath);
+
+  const relative = path.relative(UPLOAD_ROOT, resolvedPath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return null;
+  }
+
+  return resolvedPath;
+};
+
 export const analyzeResume = async (req, res) => {
-  const filepath = req.file?.path;
+  const filepath = getSafeUploadPath(req.file?.path);
 
   try {
     const user = await User.findById(req.userId).select("isActive").lean();
@@ -19,6 +37,10 @@ export const analyzeResume = async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({ message: "Resume required" });
+    }
+
+    if (!filepath) {
+      return res.status(400).json({ message: "Invalid resume file path" });
     }
 
     const user = await User.findById(req.userId).select("isActive").lean();
@@ -132,9 +154,9 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits, isActive)
-    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits isActive");
+    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
+    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits isActive").lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
