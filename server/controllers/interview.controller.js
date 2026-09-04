@@ -493,9 +493,12 @@ export const finishInterview = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // as it is not needed here, saving network bandwidth and memory overhead.
-    const interview = await Interview.findById(interviewId).select("-resumeText");
+    // PERFORMANCE OPTIMIZATION: Fetch only necessary fields and use .lean() to
+    // completely bypass Mongoose model hydration and document track-change overhead.
+    const interview = await Interview.findById(interviewId)
+      .select("userId questions")
+      .lean();
+
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
     }
@@ -506,34 +509,37 @@ export const finishInterview = async (req, res) => {
 
     const totalQuestion = interview.questions.length;
   
-   let totalScore = 0;
-   let totelConfidence=0;
-   let totelCommunication=0;
-   let totelCorrectness=0;
+    let totalScore = 0;
+    let totelConfidence = 0;
+    let totelCommunication = 0;
+    let totelCorrectness = 0;
 
-   interview.questions.forEach((q) => {
-    totalScore += q.score || 0;
-    totelConfidence += q.confidence || 0;
-    totelCommunication += q.communication || 0;
-    totelCorrectness += q.correctness || 0;
-   });
+    interview.questions.forEach((q) => {
+      totalScore += q.score || 0;
+      totelConfidence += q.confidence || 0;
+      totelCommunication += q.communication || 0;
+      totelCorrectness += q.correctness || 0;
+    });
 
-  const finalScore = totalQuestion
-        ? totalScore / totalQuestion
-        : 0;
-  const avgConfidence = totelConfidence
-        ? totelConfidence / totalQuestion
-        : 0;
-  const avgCommunication = totelCommunication
-        ? totelCommunication / totalQuestion
-        : 0;
-  const avgCorrectness = totelCorrectness
-        ? totelCorrectness / totalQuestion
-        : 0;
+    const finalScore = totalQuestion
+          ? totalScore / totalQuestion
+          : 0;
+    const avgConfidence = totelConfidence
+          ? totelConfidence / totalQuestion
+          : 0;
+    const avgCommunication = totelCommunication
+          ? totelCommunication / totalQuestion
+          : 0;
+    const avgCorrectness = totelCorrectness
+          ? totelCorrectness / totalQuestion
+          : 0;
        
-    interview.finalScore = finalScore;
-    interview.status = "complete";
-    await interview.save();
+    // PERFORMANCE OPTIMIZATION: Update status and finalScore using a targeted
+    // atomic updateOne operation instead of heavy hydrated document.save().
+    await Interview.updateOne(
+      { _id: interviewId },
+      { $set: { finalScore, status: "complete" } }
+    );
 
     return res.status(200).json({ 
       finalScore: Number(finalScore).toFixed(1),
