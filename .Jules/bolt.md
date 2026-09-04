@@ -1,5 +1,9 @@
 # Bolt's Journal
 
+## 2026-08-12 - Below-the-Fold Landing Page Image Lazy Loading
+**Learning:** Landing pages often import and render heavy visual assets (e.g. ~1.3MB of images) in below-the-fold sections like features, capabilities, or modes. When loaded normally, these block the browser's main thread and defer critical Time to Interactive (TTI) metrics. Adding native `loading="lazy"` to these `<img>` elements ensures the browser only requests them when they scroll into viewport, greatly saving bandwidth and speeding up page responsiveness.
+**Action:** Always verify homepage and landing page image tags below the fold and apply native `loading="lazy"` to optimize initial paint metrics and resource usage.
+
 ## 2026-07-21 - Mongoose `.lean()` and ID Serialization Gotchas
 **Learning:** In Mongoose, using `.lean()` for read-only queries provides substantial performance benefits (typically 5x-10x speedup and significantly lower memory overhead) by skipping model hydration and returning plain objects. However, doing so bypasses schema-level transforms and virtual fields, such as converting `_id` to `id` (via `toJSON` or `toObject` transforms).
 **Action:** When optimizing with `.lean()`, always manually serialize the `id` field (`user.id = user._id.toString()`) if the client application or other downstream code expects it, to prevent silent API contract breaks.
@@ -28,6 +32,6 @@
 **Learning:** For high-frequency OAuth login paths (such as `googleAuth`), querying the user via `.findOne().lean()` avoids costly Mongoose document hydration. Furthermore, updating user details (e.g., name, picture, lastLoginAt) using an atomic `findOneAndUpdate` with `{ new: true }` and `.lean()` completely bypasses model change tracking, schema validations, and `.save()` hook execution overhead.
 **Action:** Always prefer `.findOne().lean()` followed by an atomic `findOneAndUpdate` update with `.lean()` for high-throughput login update flows.
 
-## 2026-07-28 - Native Image Lazy Loading for Viewport Defers
-**Learning:** Landing page components loaded during the initial page bootstrap often contain high-resolution media assets below-the-fold (such as capabilities or mode banners), resulting in wasteful initial bandwidth utilization and slower TTI (Time to Interactive). Leveraging browser native `loading="lazy"` on those images defers network fetch completely until the user scrolls near the viewport.
-**Action:** For all visual mockups, feature cards, and graphics residing below the initial fold on public-facing landing pages, apply `loading="lazy"` to defer downloading heavy assets and preserve bandwidth.
+## 2026-07-25 - Atomic Balance Updates and Concurrency Protection
+**Learning:** Performing state-changing operations (like credit deductions) using non-atomic patterns (`findOne`, check balance, `.save()`) is highly vulnerable to concurrent race conditions (double spending) and introduces substantial database round-trip overhead. Simply converting query objects to `.lean()` causes downstream `.save()` calls to fail.
+**Action:** Use `findOneAndUpdate` with query-level balance validation (e.g., `{ credits: { $gte: cost } }`) and `$inc` operators with `.lean()` to execute atomic balance modifications in a single efficient query.
