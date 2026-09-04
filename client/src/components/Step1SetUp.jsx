@@ -371,7 +371,7 @@ function Step1SetUp({ onStart }) {
               <label htmlFor="resume-upload-trigger" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Resume
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <button
                   id="resume-upload-trigger"
                   ref={uploadTriggerRef}
@@ -399,10 +399,10 @@ function Step1SetUp({ onStart }) {
                       setAnalysisStatus(null);
                       setAnalysisError("");
                     }}
-                    aria-label="Remove uploaded resume"
-                    className="px-4 py-3 border border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 rounded-xl transition focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20 flex items-center justify-center cursor-pointer"
+                    aria-label="Remove selected resume"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20 focus-visible:border-red-500 transition-colors"
                   >
-                    <FaTimes size={16} />
+                    <FaTimes size={18} />
                   </button>
                 )}
               </div>
@@ -557,7 +557,7 @@ function Step1SetUp({ onStart }) {
               }`}
             >
               <input
-                key={resumeFile ? resumeFile.name : "empty"}
+                key={resumeFile ? resumeFile.name : "empty-file-input"}
                 type="file"
                 id="resumeUpload"
                 key={resumeFile ? resumeFile.name : "empty"}
@@ -589,7 +589,7 @@ function Step1SetUp({ onStart }) {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
-                    <div className="mt-4 flex gap-2 justify-center w-full max-w-[280px] mx-auto">
+                    <div className="flex gap-2 justify-center mt-4" onClick={(e) => e.stopPropagation()}>
                       <motion.button
                         type="button"
                         whileHover={{ scale: 1.02 }}
@@ -598,9 +598,9 @@ function Step1SetUp({ onStart }) {
                           handleUploadResume();
                         }}
                         disabled={analyzing}
-                        className="min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-black"
+                        className="min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                       >
-                        {analyzing ? "Analyzing..." : "Analyze"}
+                        {analyzing ? "Analyzing..." : "Analyze Resume"}
                       </motion.button>
                       <motion.button
                         type="button"
@@ -613,8 +613,8 @@ function Step1SetUp({ onStart }) {
                           setAnalysisError("");
                         }}
                         disabled={analyzing}
-                        aria-label="Remove selected resume file"
-                        className="min-h-[44px] border border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 px-4 py-2.5 rounded-lg transition flex-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 cursor-pointer"
+                        aria-label="Remove and discard this resume file"
+                        className="min-h-[44px] border border-red-200 bg-red-50 text-red-600 px-5 py-2.5 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Remove
                       </motion.button>
