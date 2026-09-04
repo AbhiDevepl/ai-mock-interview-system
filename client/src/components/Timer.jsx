@@ -9,12 +9,11 @@ function Timer({ timeLeft = 0, totalTime = 0 }) {
   return (
     <div
       className="w-20 h-20"
-      role="timer"
-      aria-live="polite"
-      aria-label={`Time remaining: ${timeLeft} seconds`}
+      role="progressbar"
       aria-valuenow={timeLeft}
       aria-valuemin={0}
       aria-valuemax={totalTime}
+      aria-label={`Time remaining: ${timeLeft} seconds`}
     >
       <CircularProgressbar
         value={percentage}
