@@ -34,12 +34,16 @@ function Footer() {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
           <div className="lg:col-span-1">
-            <div className="flex items-center gap-3 mb-4">
+            <a
+              href="/"
+              aria-label="InterviewIQ.AI - Back to Home"
+              className="inline-flex items-center gap-3 mb-4 p-1.5 -m-1.5 rounded-xl hover:bg-gray-100/80 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
               <div className="bg-black text-white p-2 rounded-lg">
                 <BsRobot size={18} />
               </div>
-              <span className="font-semibold text-base md:text-lg">InterviewIQ.AI</span>
-            </div>
+              <span className="font-semibold text-base md:text-lg text-gray-900">InterviewIQ.AI</span>
+            </a>
             <p className="text-gray-500 text-sm leading-relaxed">
               AI Powered Mock Interview System
             </p>
