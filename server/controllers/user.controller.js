@@ -17,19 +17,23 @@ export const getCurrentUser = async (req, res) => {
       console.error(`User not found for ID: ${userId}`);
       return res.status(401).json({ message: "Authentication required." });
     }
-
     if (user.isActive === false) {
-      const isProduction = process.env.NODE_ENV === "production";
+      console.error(`User account is deactivated: ${userId}`);
       res.clearCookie("token", {
         httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         path: "/",
       });
-      console.error(`Attempt to access getCurrentUser from deactivated user: ${userId}`);
-      return res.status(401).json({ message: "Authentication required." });
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/",
+      });
+      return res.status(401).json({ message: "Unauthorized access." });
     }
-
+    delete user.isActive;
     // Manually serialize id since Mongoose toJSON transform won't run on lean objects
     user.id = user._id.toString();
     delete user.isActive;
