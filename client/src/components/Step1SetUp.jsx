@@ -56,6 +56,7 @@ function Step1SetUp({ onStart }) {
   };
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
   const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -506,6 +507,7 @@ function Step1SetUp({ onStart }) {
 
             <motion.div
               whileHover={analysisStatus === "success" ? undefined : { scale: 1.01 }}
+              animate={{ scale: isDragging ? 1.02 : 1 }}
               onClick={
                 analysisStatus === "success"
                   ? undefined
@@ -517,6 +519,26 @@ function Step1SetUp({ onStart }) {
                   document.getElementById("resumeUpload")?.click();
                 }
               }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (analysisStatus !== "success") {
+                  setIsDragging(true);
+                }
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                if (analysisStatus !== "success") {
+                  const file = e.dataTransfer.files?.[0];
+                  if (file && file.type === "application/pdf") {
+                    setResumeFile(file);
+                  }
+                }
+              }}
               role={analysisStatus === "success" ? undefined : "button"}
               tabIndex={analysisStatus === "success" ? undefined : 0}
               aria-label={
@@ -524,11 +546,13 @@ function Step1SetUp({ onStart }) {
                   ? "Resume analyzed successfully"
                   : resumeFile
                   ? `Selected resume file: ${resumeFile.name}. Click or press Enter to change.`
-                  : "Click or press Enter to upload PDF resume"
+                  : "Click, press Enter, or drag and drop to upload PDF resume"
               }
-              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
+              className={`group mt-5 border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${
                 analysisStatus === "success"
                   ? "border-emerald-300 bg-emerald-50/60"
+                  : isDragging
+                  ? "border-emerald-500 bg-emerald-50/60 shadow-lg shadow-emerald-500/10"
                   : "border-gray-300 cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/60"
               }`}
             >
