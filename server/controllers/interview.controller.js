@@ -133,16 +133,12 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Check credits and isActive using a fast, read-only lean query
-    // before calling the expensive AI service. This avoids fetching and hydrating
-    // unused fields, saving database bandwidth and server memory, and avoids
-    // AI calls for users with insufficient credits or deactivated accounts.
-    const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
+    // PERFORMANCE OPTIMIZATION: Check credits using a very fast, read-only lean query
+    // before calling the expensive AI service. This avoids fetching and hydrating unused fields,
+    // saving database bandwidth and server memory, and avoids AI calls for users with insufficient credits.
+    const userPreCheck = await User.findById(req.userId).select("credits").lean();
     if (!userPreCheck) {
       return res.status(404).json({ message: "User not found" });
-    }
-    if (userPreCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
     }
     if (userPreCheck.credits < 50) {
       return res
@@ -234,15 +230,16 @@ export const generateQuestion = async (req, res) => {
       return res.status(500).json({ message: "Failed to generate questions" });
     }
 
-    // PERFORMANCE OPTIMIZATION: Deduct credits atomically only if the user has >= 50 credits.
-    // This prevents concurrent double-spending race conditions and avoids Mongoose document hydration.
-    const updatedUser = await User.findOneAndUpdate(
+    // PERFORMANCE OPTIMIZATION: State-changing DB operation (credit deduction) performed atomically.
+    // Uses findOneAndUpdate with $inc and .lean() to prevent concurrent update race conditions (double-spending)
+    // and completely bypass Mongoose model hydration and save/validation hooks overhead.
+    const user = await User.findOneAndUpdate(
       { _id: req.userId, credits: { $gte: 50 } },
       { $inc: { credits: -50 } },
       { new: true, select: "_id name email credits", lean: true }
     );
 
-    if (!updatedUser) {
+    if (!user) {
       const userExists = await User.findById(req.userId).select("_id").lean();
       if (!userExists) {
         return res.status(404).json({ message: "User not found" });
