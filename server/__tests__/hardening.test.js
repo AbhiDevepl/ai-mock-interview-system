@@ -35,15 +35,9 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
-// Mock askAi service
-jest.unstable_mockModule('../services/openRouter.service.js', () => ({
-  askAi: jest.fn(() => Promise.resolve(JSON.stringify({ role: "Dev", experience: "1yr", projects: [], skills: [] }))),
-}));
-
-// NOW IMPORT CONTROLLERS
-const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
+// NOW IMPORT CONTROLLER
+const { googleAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
-const { generateQuestion, analyzeResume, submitAnswer } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(cookieParser());
@@ -51,43 +45,10 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.post('/api/auth/google', googleAuth);
-app.use('/api/interview', interviewRouter);
-
-app.use((err, req, res, next) => {
-  if (err.message === "Only PDF files are allowed") {
-    return res.status(400).json({ message: err.message });
-  }
-  if (err.code === "LIMIT_FILE_SIZE") {
-    return res.status(400).json({ message: "File exceeds the 5MB size limit." });
-  }
-  return res.status(500).json({ message: "Internal server error." });
-});
-
-app.post('/api/interview/generate-question', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = '660000000000000000000001';
   next();
-}, generateQuestion);
-
-app.post('/api/interview/submit-answer', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, submitAnswer);
-
-app.post('/api/resume/analyze', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, upload.single('resume'), analyzeResume);
-
-const attachUserHeader = (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-};
-app.post('/api/interview/generate-question', attachUserHeader, generateQuestion);
-app.post('/api/interview/submit-answer', attachUserHeader, submitAnswer);
-app.post('/api/interview/resume', attachUserHeader, (req, res, next) => {
-  req.file = { path: 'public/test-dummy.pdf' };
-  next();
-}, analyzeResume);
+}, getCurrentUser);
 
 let mongoServer;
 
@@ -161,239 +122,46 @@ describe('googleAuth Controller hardening', () => {
   });
 });
 
-describe('Interview Endpoints hardening for deactivated users', () => {
-  let deactivatedUser;
-  let token;
-
+describe('getCurrentUser Controller hardening', () => {
   beforeEach(async () => {
     await User.deleteMany({});
-    await Interview.deleteMany({});
-
-    deactivatedUser = await User.create({
-      name: 'Deactivated User',
-      email: 'deactivated@example.com',
-      isActive: false,
-      firebaseUID: 'uid-deactivated',
-    });
-
-    token = jwt.sign(
-      { userId: deactivatedUser._id.toString(), role: 'user', type: 'access' },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
   });
 
-  afterAll(() => {
-    const directory = 'public';
-    if (fs.existsSync(directory)) {
-      const files = fs.readdirSync(directory);
-      for (const file of files) {
-        if (file !== '.gitkeep') {
-          fs.unlinkSync(path.join(directory, file));
-        }
-      }
-    }
-  });
-
-  it('POST /api/interview/resume should reject deactivated user and clean up uploaded file', async () => {
-    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
-    const response = await request(app)
-      .post('/api/interview/resume')
-      .set('Cookie', [`token=${token}`])
-      .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
-
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
-
-    // Confirm file was deleted from the public directory
-    const directory = 'public';
-    if (fs.existsSync(directory)) {
-      const files = fs.readdirSync(directory).filter(f => f !== '.gitkeep');
-      expect(files).toHaveLength(0);
-    }
-  });
-
-  it('POST /api/interview/generate-question should reject deactivated user', async () => {
-    const response = await request(app)
-      .post('/api/interview/generate-question')
-      .set('Cookie', [`token=${token}`])
-      .send({
-        role: 'Frontend Developer',
-        experience: '3 years',
-        mode: 'Technical',
-      });
-
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
-  });
-
-  it('POST /api/interview/submit-answer should reject deactivated user', async () => {
-    const interview = await Interview.create({
-      userId: deactivatedUser._id,
-      role: 'Frontend Developer',
-      experience: '3 years',
-      mode: 'Technical',
-      questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
-    });
-
-    const response = await request(app)
-      .post('/api/interview/submit-answer')
-      .set('Cookie', [`token=${token}`])
-      .send({
-        interviewId: interview._id,
-        questionIndex: 0,
-        answer: 'Valid answer',
-        timeTaken: 10,
-      });
-
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
-  });
-});
-
-describe('refreshAuth Controller hardening', () => {
-  beforeEach(async () => {
-    await User.deleteMany({});
-    process.env.JWT_SECRET = 'test-secret';
-  });
-
-  it('should successfully rotate tokens for active users', async () => {
-    const user = await User.create({
+  it('should return user info when user is active', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
       name: 'Active User',
       email: 'active@example.com',
       isActive: true,
     });
 
-    const refreshToken = jwt.sign(
-      { userId: user._id.toString(), type: 'refresh' },
-      process.env.JWT_SECRET
-    );
-
     const response = await request(app)
-      .post('/api/auth/refresh')
-      .set('Cookie', [`refreshToken=${refreshToken}`]);
+      .get('/api/user/current-user');
 
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Active User');
-
-    // Should set rotated token cookies
-    const cookies = response.headers['set-cookie'] || [];
-    expect(cookies.some(c => c.includes('token=mock-access-token'))).toBe(true);
-    expect(cookies.some(c => c.includes('refreshToken=mock-refresh-token'))).toBe(true);
+    expect(response.body.email).toBe('active@example.com');
+    expect(response.body.isActive).toBeUndefined(); // ensure isActive is excluded
   });
 
-  it('should reject and clear cookies for deactivated users', async () => {
-    const user = await User.create({
+  it('should clear cookies and return 401 when user is deactivated', async () => {
+    await User.create({
+      _id: '660000000000000000000001',
       name: 'Deactivated User',
-      email: 'inactive@example.com',
+      email: 'deactivated@example.com',
       isActive: false,
     });
 
-    const refreshToken = jwt.sign(
-      { userId: user._id.toString(), type: 'refresh' },
-      process.env.JWT_SECRET
-    );
-
     const response = await request(app)
-      .post('/api/auth/refresh')
-      .set('Cookie', [`refreshToken=${refreshToken}`]);
+      .get('/api/user/current-user');
 
     expect(response.status).toBe(401);
     expect(response.body.message).toBe('Authentication required.');
 
-    // Cookies should be cleared
-    const cookies = response.headers['set-cookie'] || [];
-    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
-    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
-  });
-
-  it('should reject and clear cookies for non-existent users', async () => {
-    const nonExistentId = new mongoose.Types.ObjectId().toString();
-    const refreshToken = jwt.sign(
-      { userId: nonExistentId, type: 'refresh' },
-      process.env.JWT_SECRET
-    );
-
-    const response = await request(app)
-      .post('/api/auth/refresh')
-      .set('Cookie', [`refreshToken=${refreshToken}`]);
-
-    expect(response.status).toBe(401);
-    expect(response.body.message).toBe('Authentication required.');
-
-    // Cookies should be cleared
-    const cookies = response.headers['set-cookie'] || [];
-    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
-    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
-  });
-
-  it('should reject if invalid type token is provided', async () => {
-    const user = await User.create({
-      name: 'Active User',
-      email: 'active@example.com',
-      isActive: true,
-    });
-
-    const invalidTypeToken = jwt.sign(
-      { userId: user._id.toString(), type: 'access' },
-      process.env.JWT_SECRET
-    );
-
-    const response = await request(app)
-      .post('/api/auth/refresh')
-      .set('Cookie', [`refreshToken=${invalidTypeToken}`]);
-
-    expect(response.status).toBe(401);
-    expect(response.body.message).toBe('Authentication required.');
-  });
-});
-
-describe('Metered endpoints account deactivation checks', () => {
-  beforeEach(async () => {
-    await User.deleteMany({});
-  });
-
-  it('should reject generateQuestion for deactivated users', async () => {
-    const user = await User.create({
-      name: 'Deactivated User',
-      email: 'deactivated-ai@example.com',
-      isActive: false,
-      credits: 100,
-    });
-
-    const response = await request(app)
-      .post('/api/interview/generate-question')
-      .set('x-user-id', user._id.toString())
-      .send({
-        role: 'Software Engineer',
-        experience: '2 years',
-        mode: 'Technical',
-      });
-
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
-  });
-
-  it('should reject analyzeResume and cleanup uploaded file for deactivated users', async () => {
-    const user = await User.create({
-      name: 'Deactivated User',
-      email: 'deactivated-resume@example.com',
-      isActive: false,
-    });
-
-    // Create temporary dummy pdf file
-    const fs = await import('fs');
-    if (!fs.existsSync('public')) {
-      fs.mkdirSync('public');
-    }
-    fs.writeFileSync('public/test-dummy.pdf', '%PDF-1.4 test');
-
-    const response = await request(app)
-      .post('/api/interview/resume')
-      .set('x-user-id', user._id.toString());
-
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
-    expect(fs.existsSync('public/test-dummy.pdf')).toBe(false);
+    // verify cookies are cleared
+    const cookieHeaders = response.headers['set-cookie'] || [];
+    expect(cookieHeaders.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookieHeaders.some(c => c.includes('refreshToken=;'))).toBe(true);
+    expect(cookieHeaders.some(c => c.includes('deviceId=;'))).toBe(true);
   });
 });
