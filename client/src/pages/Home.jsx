@@ -223,7 +223,7 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center">
                     <div className="w-full md:w-1/2 flex justify-center">
-                      {/* PERFORMANCE OPTIMIZATION: Use native loading="lazy" for below-the-fold images to avoid fetching heavy assets (~1.3MB) on initial load */}
+                      {/* PERFORMANCE OPTIMIZATION: Defer loading of heavy below-the-fold assets until scrolled into view */}
                       <img
                         src={item.img}
                         alt={item.title}
@@ -269,7 +269,7 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center gap-6">
                     <div className="w-full md:w-1/2 flex justify-center">
-                      {/* PERFORMANCE OPTIMIZATION: Use native loading="lazy" for below-the-fold images to avoid fetching heavy assets (~1.3MB) on initial load */}
+                      {/* PERFORMANCE OPTIMIZATION: Defer loading of heavy below-the-fold assets until scrolled into view */}
                       <img
                         src={item.img}
                         alt={item.title}
