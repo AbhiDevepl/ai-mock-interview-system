@@ -22,6 +22,14 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
+    const requestingUser = await User.findById(req.userId).select("isActive").lean();
+    if (requestingUser && requestingUser.isActive === false) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
+
     const fileBuffer = await fs.promises.readFile(filepath);
     const uint8Array = new Uint8Array(fileBuffer);
     const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
@@ -125,15 +133,16 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
-    // before calling the expensive AI service. This avoids fetching and hydrating
-    // unused fields, saving database bandwidth and server memory, and avoids
-    // AI calls for users with insufficient credits.
-    const userPreCheck = await User.findById(req.userId).select("credits").lean();
-    if (!userPreCheck) {
+    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits, isActive)
+    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits isActive").lean();
+    if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (userPreCheck.credits < 50) {
+    if (user.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
+    if (user.credits < 50) {
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
@@ -313,6 +322,27 @@ export const submitAnswer = async (req, res) => {
 
     if (answer !== undefined && answer.length > 5000) {
       return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
+    }
+
+    const requestingUser = await User.findById(req.userId).select("isActive").lean();
+    if (requestingUser && requestingUser.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
+
+    // PERFORMANCE OPTIMIZATION: Use .select("userId questions").lean() to bypass document hydration,
+    // saving considerable CPU/memory. Exclude heavy fields like 'resumeText' (which can be up to 100KB).
+    const interview = await Interview.findById(interviewId).select("userId questions").lean();
+
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found" });
+    }
+
+    if (interview.userId.toString() !== req.userId) {
+      return res.status(403).json({ message: "Unauthorized access." });
+    }
+
+    if (questionIndex >= interview.questions.length) {
+      return res.status(400).json({ message: "Invalid question index." });
     }
 
     const question = interview.questions[questionIndex];
