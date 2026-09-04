@@ -22,14 +22,6 @@ This journal records critical user experience and accessibility insights discove
 **Learning:** Custom visual cards acting as semantic radiogroups are common in personalized user flows but are inaccessible to screen readers and keyboard-only users by default. Implementing standard arrow key navigation (ArrowLeft/ArrowRight/ArrowUp/ArrowDown, Home, End) alongside a roaming tabIndex (where only the active element has `tabIndex={0}` and others have `tabIndex={-1}`) provides a standard, native-like, accessible keyboard interaction model.
 **Action:** Always implement standard arrow key handlers, unique focusable button IDs, roaming tabIndex, and group labeling (`aria-labelledby`) for custom radiogroup controls.
 
-## 2025-03-01 - Modal Overlay Focus Management
-**Learning:** Overlays and custom dialogue modals in React applications often trap keyboard focus naturally, but fail to reset focus when dismissing or shift focus correctly when initializing. Manually capturing the pre-modal trigger element and restoring focus to it, alongside trapping keyboard tab transitions inside the modal itself, completes the user journey for screen readers and power-users.
-**Action:** Always implement explicit ref tracking and manual `.focus()` handling inside modal mount/unmount and keyboard tab traps to ensure non-mouse users are never lost or stranded.
-
-## 2025-03-03 - Header Brand Logo Accessibility & Navigation semantics
-**Learning:** Interactive branding logos are often built as non-semantic layout elements with custom click listeners but without keyboard focus support, focus rings, hover styles, or screen-reader labels. Converting these branding wrappers into semantic `<button>` elements with exact routing navigation, transition hover highlights, negative-margin compensations, and unique focus rings significantly enhances screen-reader usability.
-**Action:** When designing header and footer brand logo links, convert them into semantic button or link tags, provide distinct hover transitions, compensate padding spacing with negative margins, and add high-contrast focus indicators (`focus-visible:ring-2`) and descriptive `aria-label` tags.
-
-## 2025-03-04 - HTML5 Drag and Drop Interaction Design for Modals
-**Learning:** Native drag-and-drop file upload containers are highly intuitive but must be visually dynamic to communicate their state effectively. Combining onDragOver, onDragLeave, and onDrop with standard motion scale animations and rich hover drop-shadows transitions significantly improves click-to-drag intuitiveness.
-**Action:** When creating file upload dropzones, implement native HTML5 drag-and-drop event handlers alongside visual styling transitions like scale scaling and drop shadows.
+## 2025-03-01 - Branding Logos and Interactivity Accessibility
+**Learning:** Branding headers or logos featuring `cursor-pointer` are often styled as plain `div` elements, rendering them completely inaccessible to keyboard and screen-reader users, and failing to provide standard navigation functionality (such as returning home on click). Converting these to semantic, keyboard-focusable `<button>` elements with cohesive focus outlines and clear click handlers restores intuitive user journeys and standard accessibility.
+**Action:** Always refactor interactive branding elements from non-semantic containers to accessible `<button>` or `<a href>` elements, incorporating appropriate ARIA labels and brand-matched focus rings.
