@@ -223,12 +223,13 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center">
                     <div className="w-full md:w-1/2 flex justify-center">
-                      {/* PERFORMANCE OPTIMIZATION: Native lazy loading on below-the-fold assets to defer download, saving initial page weight and network traffic. */}
+                      {/* PERFORMANCE OPTIMIZATION: Use lazy loading for below-the-fold capability images to save network bandwidth and speed up TTI */}
                       <img
                         src={item.img}
                         alt={item.title}
                         loading="lazy"
                         className="w-full h-auto object-contain max-h-64"
+                        loading="lazy"
                       />
                     </div>
                     <div className="w-full md:w-1/2">
@@ -268,12 +269,13 @@ function Home() {
                 >
                   <div className="flex flex-col md:flex-row items-center gap-6">
                     <div className="w-full md:w-1/2 flex justify-center">
-                      {/* PERFORMANCE OPTIMIZATION: Native lazy loading on below-the-fold assets to defer download, saving initial page weight and network traffic. */}
+                      {/* PERFORMANCE OPTIMIZATION: Use lazy loading for below-the-fold mode images to save network bandwidth and speed up TTI */}
                       <img
                         src={item.img}
                         alt={item.title}
                         loading="lazy"
                         className="w-full h-auto object-contain max-h-48"
+                        loading="lazy"
                       />
                     </div>
                     <div className="w-full md:w-1/2">
