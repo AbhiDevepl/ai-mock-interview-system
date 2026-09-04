@@ -229,7 +229,6 @@ function Home() {
                         alt={item.title}
                         loading="lazy"
                         className="w-full h-auto object-contain max-h-64"
-                        loading="lazy"
                       />
                     </div>
                     <div className="w-full md:w-1/2">
@@ -275,7 +274,6 @@ function Home() {
                         alt={item.title}
                         loading="lazy"
                         className="w-full h-auto object-contain max-h-48"
-                        loading="lazy"
                       />
                     </div>
                     <div className="w-full md:w-1/2">

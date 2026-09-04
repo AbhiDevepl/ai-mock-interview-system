@@ -28,34 +28,9 @@ function Step1SetUp({ onStart }) {
   const [mode, setMode] = useState("Technical");
   const [errors, setErrors] = useState({});
 
-  const handleModeKeyDown = (e) => {
-    const currentIndex = MODES.findIndex((m) => m.id === mode);
-    let nextIndex = currentIndex;
-
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault();
-      nextIndex = (currentIndex + 1) % MODES.length;
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      nextIndex = (currentIndex - 1 + MODES.length) % MODES.length;
-    } else if (e.key === "Home") {
-      e.preventDefault();
-      nextIndex = 0;
-    } else if (e.key === "End") {
-      e.preventDefault();
-      nextIndex = MODES.length - 1;
-    } else {
-      return;
-    }
-
-    const nextMode = MODES[nextIndex].id;
-    setMode(nextMode);
-    setTimeout(() => {
-      document.getElementById(`mode-btn-${nextMode}`)?.focus();
-    }, 0);
-  };
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleModeKeyDown = (e) => {
     const currentIndex = MODES.findIndex((m) => m.id === mode);
@@ -65,6 +40,10 @@ function Step1SetUp({ onStart }) {
       nextIndex = (currentIndex + 1) % MODES.length;
     } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
       nextIndex = (currentIndex - 1 + MODES.length) % MODES.length;
+    } else if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = MODES.length - 1;
     } else {
       return;
     }
@@ -80,6 +59,7 @@ function Step1SetUp({ onStart }) {
       }
     }, 0);
   };
+
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
   const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -88,15 +68,14 @@ function Step1SetUp({ onStart }) {
   const uploadTriggerRef = React.useRef(null);
   const modalRef = React.useRef(null);
   const closeBtnRef = React.useRef(null);
+  const previousFocusRef = React.useRef(null);
 
   const closeUploadModal = () => {
     setIsUploadOpen(false);
+    setIsDragging(false);
     setAnalysisStatus(null);
     setAnalysisError("");
   };
-
-  const modalRef = React.useRef(null);
-  const previousFocusRef = React.useRef(null);
 
   React.useEffect(() => {
     if (!isUploadOpen) return;
@@ -141,8 +120,6 @@ function Step1SetUp({ onStart }) {
         }
       }
     };
-
-    const currentTrigger = uploadTriggerRef.current;
 
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -392,8 +369,7 @@ function Step1SetUp({ onStart }) {
                       <m.icon className="text-xl" />
                       <span className="font-medium text-sm">{m.label}</span>
                     </button>
-                  );
-                })}
+                ))}
               </div>
             </div>
 
@@ -515,7 +491,6 @@ function Step1SetUp({ onStart }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="upload-resume-title"
-            ref={modalRef}
             className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-6"
           >
             <button
@@ -590,7 +565,6 @@ function Step1SetUp({ onStart }) {
                 key={resumeFile ? resumeFile.name : "empty-file-input"}
                 type="file"
                 id="resumeUpload"
-                key={resumeFile ? resumeFile.name : "empty"}
                 accept="application/pdf"
                 className="hidden"
                 onChange={(e) => {
@@ -613,9 +587,11 @@ function Step1SetUp({ onStart }) {
                     <FaFileUpload className="text-2xl text-emerald-600" />
                   </span>
                   <p className="mt-3 text-gray-700 font-medium">
-                    {resumeFile
+                    {isDragging
+                      ? "Drop your resume PDF here"
+                      : resumeFile
                       ? resumeFile.name
-                      : "Click to upload resume (Optional)"}
+                      : "Click or drop file to upload resume"}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
