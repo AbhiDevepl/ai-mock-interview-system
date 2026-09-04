@@ -57,7 +57,7 @@ function Footer() {
                 <li key={link.href}>
                   <a
                     href={link.href}
-                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md"
                   >
                     {link.label}
                     <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-emerald-600 transition-all duration-200 group-hover:w-full" />
@@ -74,10 +74,7 @@ function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    onClick={(e) => {
-                      if (link.href === "#") e.preventDefault();
-                    }}
-                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                    className="group relative inline-block text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md"
                   >
                     {link.label}
                     <span className="absolute -bottom-0.5 left-0 h-px w-0 bg-emerald-600 transition-all duration-200 group-hover:w-full" />
@@ -118,10 +115,7 @@ function Footer() {
               <a
                 key={link.label}
                 href={link.href}
-                onClick={(e) => {
-                  if (link.href === "#") e.preventDefault();
-                }}
-                className="text-gray-500 text-sm hover:text-green-600 transition-colors rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                className="text-gray-500 text-sm hover:text-green-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 rounded-md"
               >
                 {link.label}
               </a>
