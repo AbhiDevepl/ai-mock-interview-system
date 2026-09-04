@@ -56,7 +56,30 @@ function Step1SetUp({ onStart }) {
   };
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+
+  const handleModeKeyDown = (e) => {
+    const currentIndex = MODES.findIndex((m) => m.id === mode);
+    let nextIndex = currentIndex;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % MODES.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + MODES.length) % MODES.length;
+    } else {
+      return;
+    }
+
+    e.preventDefault();
+    const nextMode = MODES[nextIndex];
+    setMode(nextMode.id);
+
+    setTimeout(() => {
+      const nextButton = document.getElementById(`mode-option-${nextMode.id}`);
+      if (nextButton) {
+        nextButton.focus();
+      }
+    }, 0);
+  };
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
   const [analysisError, setAnalysisError] = useState("");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -132,8 +155,16 @@ function Step1SetUp({ onStart }) {
 
   const validate = () => {
     const newErrors = {};
-    if (!role.trim()) newErrors.role = "Role is required";
-    if (!experience) newErrors.experience = "Experience level is required";
+    if (!role.trim()) {
+      newErrors.role = "Role is required";
+    } else if (role.length > 100) {
+      newErrors.role = "Role must be under 100 characters";
+    }
+    if (!experience.trim()) {
+      newErrors.experience = "Experience level is required";
+    } else if (experience.length > 100) {
+      newErrors.experience = "Experience level must be under 100 characters";
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -295,6 +326,7 @@ function Step1SetUp({ onStart }) {
                 <input
                   id="target-role"
                   type="text"
+                  maxLength={100}
                   placeholder="e.g., Frontend Developer, DevOps Engineer"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
@@ -317,6 +349,7 @@ function Step1SetUp({ onStart }) {
                 <input
                   id="experience-level"
                   type="text"
+                  maxLength={100}
                   placeholder="e.g., 3 years, Senior, Mid-level"
                   value={experience}
                   onChange={(e) => setExperience(e.target.value)}
@@ -339,24 +372,21 @@ function Step1SetUp({ onStart }) {
               <div
                 className="grid grid-cols-3 gap-3"
                 role="radiogroup"
-                aria-labelledby="interview-mode-label"
+                aria-label="Interview Mode"
+                onKeyDown={handleModeKeyDown}
               >
-                {MODES.map((m) => {
-                  const isActive = mode === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      id={`mode-btn-${m.id}`}
-                      type="button"
-                      onClick={() => setMode(m.id)}
-                      onKeyDown={handleModeKeyDown}
-                      role="radio"
-                      aria-checked={isActive}
-                      tabIndex={isActive ? 0 : -1}
-                      className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500 ${
-                        isActive
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
-                          : "border-gray-200 hover:border-emerald-300 text-gray-600"
+                {MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    id={`mode-option-${m.id}`}
+                    type="button"
+                    onClick={() => setMode(m.id)}
+                    role="radio"
+                    aria-checked={mode === m.id}
+                    tabIndex={mode === m.id ? 0 : -1}
+                    className={`p-4 rounded-xl border-2 text-center transition-all duration-200 flex flex-col items-center gap-2.5 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:border-emerald-500 ${mode === m.id
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
+                        : "border-gray-200 hover:border-emerald-300 text-gray-600"
                       }`}
                     >
                       <m.icon className="text-xl" />
