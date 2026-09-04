@@ -3,8 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import User from '../models/user.model.js';
-import fs from 'fs';
-import path from 'path';
+import Interview from '../models/interview.model.js';
 import { jest } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
@@ -44,15 +43,15 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
-// Mock askAi
-const mockAskAi = jest.fn();
-jest.unstable_mockModule('../services/openRouter.service.js', () => ({
-  askAi: mockAskAi,
-}));
+// Mock Multer upload middleware
+import { upload } from '../middleware/multer.js';
+import fs from 'fs';
+import path from 'path';
 
-// NOW IMPORT CONTROLLER AND ROUTERS
-const { googleAuth } = await import('../controllers/auth.controller.js');
+// NOW IMPORT CONTROLLER
+const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
+const { generateQuestion, analyzeResume, submitAnswer } = await import('../controllers/interview.controller.js');
 
 const app = express();
 app.use(cookieParser());
@@ -70,6 +69,16 @@ app.get('/api/user/current-user', (req, res, next) => {
   req.userId = req.headers['x-user-id'] || req.query.userId;
   next();
 }, getCurrentUser);
+
+// Helper test middleware to bind req.userId
+const mockIsAuth = (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+};
+
+app.post('/api/interview/generate-question', mockIsAuth, generateQuestion);
+app.post('/api/interview/resume', mockIsAuth, upload.single('resume'), analyzeResume);
+app.post('/api/interview/submit-answer', mockIsAuth, submitAnswer);
 
 let mongoServer;
 
@@ -494,5 +503,186 @@ describe('getCurrentUser Controller hardening', () => {
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Active User');
     expect(response.body.isActive).toBeUndefined();
+  });
+});
+
+describe('Metered endpoints deactivation validation hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    await Interview.deleteMany({});
+    const directory = 'public';
+    if (fs.existsSync(directory)) {
+      const files = fs.readdirSync(directory);
+      for (const file of files) {
+        if (file !== '.gitkeep') {
+          fs.unlinkSync(path.join(directory, file));
+        }
+      }
+    }
+  });
+
+  it('should reject deactivated users on generateQuestion with 403', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+      credits: 100,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/generate-question')
+      .set('x-user-id', user._id.toString())
+      .send({
+        role: 'Frontend Developer',
+        experience: '3 years',
+        mode: 'Behavioral',
+        projects: ['Project A'],
+        skills: ['React'],
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users on submitAnswer with 403', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post('/api/interview/submit-answer')
+      .set('x-user-id', user._id.toString())
+      .send({
+        interviewId: new mongoose.Types.ObjectId().toString(),
+        questionIndex: 0,
+        answer: 'Valid answer',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+  });
+
+  it('should reject deactivated users on analyzeResume with 403 and delete uploaded file', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'deactivated@example.com',
+      isActive: false,
+    });
+
+    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+    const response = await request(app)
+      .post('/api/interview/resume')
+      .set('x-user-id', user._id.toString())
+      .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
+
+    // Ensure public folder has no files left
+    const directory = 'public';
+    if (fs.existsSync(directory)) {
+      const files = fs.readdirSync(directory);
+      const uploadedPdfs = files.filter(f => f.endsWith('.pdf'));
+      expect(uploadedPdfs.length).toBe(0);
+    }
+  });
+});
+
+describe('refreshAuth Controller hardening', () => {
+  beforeEach(async () => {
+    await User.deleteMany({});
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  it('should successfully rotate tokens for active users', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const refreshToken = jwt.sign(
+      { userId: user._id.toString(), type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(200);
+    expect(response.body.name).toBe('Active User');
+
+    // Should set rotated token cookies
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=mock-access-token'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=mock-refresh-token'))).toBe(true);
+  });
+
+  it('should reject and clear cookies for deactivated users', async () => {
+    const user = await User.create({
+      name: 'Deactivated User',
+      email: 'inactive@example.com',
+      isActive: false,
+    });
+
+    const refreshToken = jwt.sign(
+      { userId: user._id.toString(), type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Cookies should be cleared
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+  });
+
+  it('should reject and clear cookies for non-existent users', async () => {
+    const nonExistentId = new mongoose.Types.ObjectId().toString();
+    const refreshToken = jwt.sign(
+      { userId: nonExistentId, type: 'refresh' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${refreshToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
+
+    // Cookies should be cleared
+    const cookies = response.headers['set-cookie'] || [];
+    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+    expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+  });
+
+  it('should reject if invalid type token is provided', async () => {
+    const user = await User.create({
+      name: 'Active User',
+      email: 'active@example.com',
+      isActive: true,
+    });
+
+    const invalidTypeToken = jwt.sign(
+      { userId: user._id.toString(), type: 'access' },
+      process.env.JWT_SECRET
+    );
+
+    const response = await request(app)
+      .post('/api/auth/refresh')
+      .set('Cookie', [`refreshToken=${invalidTypeToken}`]);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Authentication required.');
   });
 });

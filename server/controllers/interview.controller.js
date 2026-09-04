@@ -39,7 +39,7 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    // Harden: Reject deactivated users and clean up uploaded files
+    // Deactivation check: reject deactivated users to protect metered AI resources
     const requestUser = await User.findById(req.userId).select("isActive").lean();
     if (requestUser && requestUser.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
@@ -155,7 +155,6 @@ export const generateQuestion = async (req, res) => {
     // before calling the expensive AI service. This avoids fetching and hydrating
     // unused fields, saving database bandwidth and server memory, and avoids
     // AI calls for users with insufficient credits.
-    // Harden: Select isActive as well to ensure deactivated users are denied access.
     const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
     if (!userPreCheck) {
       return res.status(404).json({ message: "User not found" });
@@ -318,7 +317,7 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // Harden: Check if the requesting user is deactivated to protect metered AI resources
+    // Deactivation check: reject deactivated users to protect metered AI resources
     const requestUser = await User.findById(req.userId).select("isActive").lean();
     if (requestUser && requestUser.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
