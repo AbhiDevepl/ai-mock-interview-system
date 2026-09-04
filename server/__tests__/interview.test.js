@@ -441,6 +441,13 @@ describe('Interview Controller Hardening & Validation', () => {
     });
 
     it('should successfully submit and securely sanitize and parse the AI response', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'John Doe',
+        email: 'john@example.com',
+        credits: 100,
+      });
+
       const interview = await Interview.create({
         userId: '660000000000000000000001',
         role: 'Frontend',

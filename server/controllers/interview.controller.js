@@ -21,7 +21,7 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    // Verify user account is active before performing AI metered operations
+    // Verify that the requesting user's account is active to prevent unauthorized usage of LLM APIs
     const user = await User.findById(req.userId).select("isActive").lean();
     if (!user || user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
@@ -133,9 +133,9 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits)
-    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits isActive");
+    // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits, isActive)
+    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits isActive").lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -360,6 +360,12 @@ export const submitAnswer = async (req, res) => {
     }
 
     const question = interview.questions[questionIndex];
+
+    // Verify that the requesting user's account is active to prevent unauthorized usage of LLM APIs
+    const user = await User.findById(req.userId).select("isActive").lean();
+    if (!user || user.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
+    }
 
     if (!answer) {
       question.score = 0;

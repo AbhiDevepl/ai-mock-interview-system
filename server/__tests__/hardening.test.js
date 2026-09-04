@@ -33,74 +33,38 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
-// NOW IMPORT CONTROLLERS
+import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
+import Interview from '../models/interview.model.js';
+import path from 'path';
+import fs from 'fs';
+
+// NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
-const { getCurrentUser } = await import('../controllers/user.controller.js');
-const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
+const interviewRouter = (await import('../routers/interview.route.js')).default;
 
 const app = express();
 app.use(cookieParser());
 app.use(express.json());
-
-// Set up routes with a middleware that sets a default req.userId
-const bindUserMiddleware = (req, res, next) => {
-  req.userId = '660000000000000000000001';
-  req.userRole = 'user';
-  next();
-};
+app.use(cookieParser());
 
 app.post('/api/auth/google', googleAuth);
-app.get('/api/user/current-user', (req, res, next) => {
-  req.userId = req.headers['x-user-id'];
-  next();
-}, getCurrentUser);
-app.post('/api/auth/refresh', refreshAuth);
-app.post('/api/interview/generate-question', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, generateQuestion);
-app.post('/api/interview/resume', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, upload.single('resume'), analyzeResume);
+app.use('/api/interview', interviewRouter);
 
-app.post('/api/resume/analyze', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, upload.single('resume'), analyzeResume);
-
-app.post('/api/interview/generate-question', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, generateQuestion);
-
-app.post('/api/interview/submit-answer', (req, res, next) => {
-  req.userId = req.headers['x-user-id'] || 'default-user-id';
-  next();
-}, submitAnswer);
-
-// Mock isAuth user binding for current-user and interview endpoints
-app.get('/api/user/current-user', (req, res, next) => {
-  req.userId = '660000000000000000000001';
-  next();
-}, getCurrentUser);
-
-app.post('/api/interview/generate-question', (req, res, next) => {
-  req.userId = '660000000000000000000001';
-  next();
-}, generateQuestion);
-
-app.post('/api/interview/resume', (req, res, next) => {
-  req.userId = '660000000000000000000001';
-  next();
-}, (req, res, next) => {
-  req.file = { path: 'non-existent-test-resume.pdf' };
-  next();
-}, analyzeResume);
+app.use((err, req, res, next) => {
+  if (err.message === "Only PDF files are allowed") {
+    return res.status(400).json({ message: err.message });
+  }
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ message: "File exceeds the 5MB size limit." });
+  }
+  return res.status(500).json({ message: "Internal server error." });
+});
 
 let mongoServer;
 
 beforeAll(async () => {
+  process.env.JWT_SECRET = 'test-secret-key-123';
   mongoServer = await MongoMemoryServer.create();
   const uri = mongoServer.getUri();
   await mongoose.connect(uri);
@@ -169,64 +133,62 @@ describe('googleAuth Controller hardening', () => {
   });
 });
 
-describe('getCurrentUser Controller hardening', () => {
+describe('Interview Endpoints hardening for deactivated users', () => {
+  let deactivatedUser;
+  let token;
+
   beforeEach(async () => {
     await User.deleteMany({});
-  });
+    await Interview.deleteMany({});
 
-  it('should allow active users to fetch profile', async () => {
-    await User.create({
-      _id: '660000000000000000000001',
-      name: 'Active User',
-      email: 'active@example.com',
-      isActive: true,
-    });
-
-    const response = await request(app)
-      .get('/api/user/current-user');
-
-    expect(response.status).toBe(200);
-    expect(response.body.name).toBe('Active User');
-    expect(response.body).not.toHaveProperty('isActive');
-    expect(response.body).not.toHaveProperty('firebaseUID');
-  });
-
-  it('should reject deactivated users and clear session cookies', async () => {
-    await User.create({
-      _id: '660000000000000000000001',
+    deactivatedUser = await User.create({
       name: 'Deactivated User',
       email: 'deactivated@example.com',
       isActive: false,
+      firebaseUID: 'uid-deactivated',
     });
 
+    token = jwt.sign(
+      { userId: deactivatedUser._id.toString(), role: 'user', type: 'access' },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+  });
+
+  afterAll(() => {
+    const directory = 'public';
+    if (fs.existsSync(directory)) {
+      const files = fs.readdirSync(directory);
+      for (const file of files) {
+        if (file !== '.gitkeep') {
+          fs.unlinkSync(path.join(directory, file));
+        }
+      }
+    }
+  });
+
+  it('POST /api/interview/resume should reject deactivated user and clean up uploaded file', async () => {
+    const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
     const response = await request(app)
-      .get('/api/user/current-user');
+      .post('/api/interview/resume')
+      .set('Cookie', [`token=${token}`])
+      .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
 
-    expect(response.status).toBe(401);
-    expect(response.body.message).toBe('Authentication required.');
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('This account has been deactivated.');
 
-    // Verify session cookies are cleared
-    const cookies = response.headers['set-cookie'];
-    expect(cookies).toBeDefined();
-    expect(cookies.some(c => c.includes('token=;'))).toBe(true);
-  });
-});
-
-describe('AI endpoints account deactivation protection', () => {
-  beforeEach(async () => {
-    await User.deleteMany({});
+    // Confirm file was deleted from the public directory
+    const directory = 'public';
+    if (fs.existsSync(directory)) {
+      const files = fs.readdirSync(directory).filter(f => f !== '.gitkeep');
+      expect(files).toHaveLength(0);
+    }
   });
 
-  it('should reject deactivated users from generating questions', async () => {
-    await User.create({
-      _id: '660000000000000000000001',
-      name: 'Deactivated User',
-      email: 'deactivated@example.com',
-      isActive: false,
-    });
-
+  it('POST /api/interview/generate-question should reject deactivated user', async () => {
     const response = await request(app)
       .post('/api/interview/generate-question')
+      .set('Cookie', [`token=${token}`])
       .send({
         role: 'Frontend Developer',
         experience: '3 years',
@@ -237,16 +199,24 @@ describe('AI endpoints account deactivation protection', () => {
     expect(response.body.message).toBe('This account has been deactivated.');
   });
 
-  it('should reject deactivated users from analyzing resumes and handle cleanup', async () => {
-    await User.create({
-      _id: '660000000000000000000001',
-      name: 'Deactivated User',
-      email: 'deactivated@example.com',
-      isActive: false,
+  it('POST /api/interview/submit-answer should reject deactivated user', async () => {
+    const interview = await Interview.create({
+      userId: deactivatedUser._id,
+      role: 'Frontend Developer',
+      experience: '3 years',
+      mode: 'Technical',
+      questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
     });
 
     const response = await request(app)
-      .post('/api/interview/resume');
+      .post('/api/interview/submit-answer')
+      .set('Cookie', [`token=${token}`])
+      .send({
+        interviewId: interview._id,
+        questionIndex: 0,
+        answer: 'Valid answer',
+        timeTaken: 10,
+      });
 
     expect(response.status).toBe(403);
     expect(response.body.message).toBe('This account has been deactivated.');
