@@ -36,7 +36,7 @@ jest.unstable_mockModule('../config/token.js', () => ({
 // NOW IMPORT CONTROLLER
 const { googleAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
-const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
+const { analyzeResume, generateQuestion, submitAnswer } = await import('../controllers/interview.controller.js');
 const { upload } = await import('../middleware/multer.js');
 
 const app = express();
@@ -64,6 +64,21 @@ app.post('/api/interview/resume', (req, res, next) => {
   req.userId = req.headers['x-user-id'] || 'default-user-id';
   next();
 }, upload.single('resume'), analyzeResume);
+
+app.post('/api/resume/analyze', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, upload.single('resume'), analyzeResume);
+
+app.post('/api/interview/generate-question', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, generateQuestion);
+
+app.post('/api/interview/submit-answer', (req, res, next) => {
+  req.userId = req.headers['x-user-id'] || 'default-user-id';
+  next();
+}, submitAnswer);
 
 let mongoServer;
 
@@ -295,47 +310,88 @@ describe('refreshAuth Controller hardening', () => {
   });
 });
 
-describe('Metered Interview Endpoints Deactivation hardening', () => {
+describe('Metered Controllers hardening', () => {
+  let deactivatedUser;
+
   beforeEach(async () => {
     await User.deleteMany({});
-  });
-
-  it('should reject generateQuestion for deactivated users', async () => {
-    const deactivatedUser = await User.create({
-      name: 'Deactivated User',
-      email: 'deactivated-questions@example.com',
-      isActive: false,
-      credits: 100,
-    });
-
-    const response = await request(app)
-      .post('/api/interview/generate-question')
-      .set('x-user-id', deactivatedUser._id.toString())
-      .send({
-        role: 'Software Engineer',
-        experience: '2 years',
-        mode: 'Technical',
-      });
-
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
-  });
-
-  it('should reject analyzeResume for deactivated users', async () => {
-    const deactivatedUser = await User.create({
-      name: 'Deactivated User',
-      email: 'deactivated-resume@example.com',
+    deactivatedUser = await User.create({
+      _id: new mongoose.Types.ObjectId().toString(),
+      name: 'Banned User',
+      email: 'banned@example.com',
       isActive: false,
     });
+  });
 
-    const pdfBuffer = Buffer.from('%PDF-1.4 dummy pdf content');
+  describe('analyzeResume', () => {
+    it('should reject deactivated users and delete uploaded file', async () => {
+      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      const response = await request(app)
+        .post('/api/resume/analyze')
+        .set('x-user-id', deactivatedUser._id.toString())
+        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
 
-    const response = await request(app)
-      .post('/api/interview/resume')
-      .set('x-user-id', deactivatedUser._id.toString())
-      .attach('resume', pdfBuffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('Forbidden: Account is deactivated.');
+    });
 
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe('This account has been deactivated.');
+    it('should return 404 if user not found and delete uploaded file', async () => {
+      const nonExistentId = new mongoose.Types.ObjectId().toString();
+      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      const response = await request(app)
+        .post('/api/resume/analyze')
+        .set('x-user-id', nonExistentId)
+        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe('User not found');
+    });
+  });
+
+  describe('generateQuestion', () => {
+    it('should reject deactivated users', async () => {
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .set('x-user-id', deactivatedUser._id.toString())
+        .send({
+          role: 'Backend',
+          experience: '2 years',
+          mode: 'Technical',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('Forbidden: Account is deactivated.');
+    });
+  });
+
+  describe('submitAnswer', () => {
+    it('should reject deactivated users', async () => {
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .set('x-user-id', deactivatedUser._id.toString())
+        .send({
+          interviewId: new mongoose.Types.ObjectId().toString(),
+          questionIndex: 0,
+          answer: 'Some answer',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('Forbidden: Account is deactivated.');
+    });
+
+    it('should return 404 if user not found', async () => {
+      const nonExistentId = new mongoose.Types.ObjectId().toString();
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .set('x-user-id', nonExistentId)
+        .send({
+          interviewId: new mongoose.Types.ObjectId().toString(),
+          questionIndex: 0,
+          answer: 'Some answer',
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe('User not found');
+    });
   });
 });

@@ -22,18 +22,19 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
+    // Harden: Ensure requesting user is active before processing metered upload
     const requestUser = await User.findById(req.userId).select("isActive").lean();
     if (!requestUser) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
-      return res.status(404).json({ message: "User not found." });
+      return res.status(404).json({ message: "User not found" });
     }
     if (requestUser.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
-      return res.status(403).json({ message: "This account has been deactivated." });
+      return res.status(403).json({ message: "Forbidden: Account is deactivated." });
     }
 
     const fileBuffer = await fs.promises.readFile(filepath);
@@ -139,10 +140,10 @@ export const generateQuestion = async (req, res) => {
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
 
-    // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
-    // before calling the expensive AI service. This avoids fetching and hydrating
-    // unused fields, saving database bandwidth and server memory, and avoids
-    // AI calls for users with insufficient credits. Also check user activation.
+    // PERFORMANCE OPTIMIZATION & HARDENING: Check credits and user status using a fast,
+    // read-only lean query before calling the expensive AI service. This avoids fetching
+    // and hydrating unused fields, saving database bandwidth and server memory, and avoids
+    // AI calls for deactivated users or those with insufficient credits.
     const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
     if (!userPreCheck) {
       return res.status(404).json({ message: "User not found." });
@@ -152,6 +153,9 @@ export const generateQuestion = async (req, res) => {
     }
     if (userPreCheck.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
+    }
+    if (userPreCheck.isActive === false) {
+      return res.status(403).json({ message: "Forbidden: Account is deactivated." });
     }
     if (userPreCheck.credits < 50) {
       return res
@@ -302,12 +306,13 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
+    // Harden: Verify that the requesting user's account is active before performing AI evaluation
     const requestUser = await User.findById(req.userId).select("isActive").lean();
     if (!requestUser) {
-      return res.status(404).json({ message: "User not found." });
+      return res.status(404).json({ message: "User not found" });
     }
     if (requestUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
+      return res.status(403).json({ message: "Forbidden: Account is deactivated." });
     }
 
     // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
