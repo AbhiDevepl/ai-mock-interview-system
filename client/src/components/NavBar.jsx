@@ -70,15 +70,15 @@ function NavBar() {
       >
         <button
           onClick={() => navigate("/")}
-          aria-label="InterviewIQ.AI home"
-          className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 transition p-2 -m-2 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+          aria-label="InterviewIQ.AI - Go to home page"
+          className="flex items-center gap-3 rounded-xl p-1.5 hover:bg-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
         >
           <div className="bg-black text-white p-2 rounded-lg">
             <BsRobot size={18} />
           </div>
-          <h1 className="font-semibold hidden md:block text-lg text-gray-900">
+          <span className="font-semibold hidden md:block text-lg text-gray-900">
             InterviewIQ.AI
-          </h1>
+          </span>
         </button>
 
         <div className="flex items-center gap-6 relative">
