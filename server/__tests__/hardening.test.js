@@ -25,59 +25,16 @@ jest.unstable_mockModule('../config/token.js', () => ({
   genRefreshToken: jest.fn(() => 'mock-refresh-token'),
 }));
 
-// Mock OpenRouter/Groq Service
+// Mock openRouter.service.js to allow testing of generateQuestion/analyzeResume
 const mockAskAi = jest.fn();
 jest.unstable_mockModule('../services/openRouter.service.js', () => ({
   askAi: mockAskAi,
 }));
 
-// Mock pdfjs-dist Text Extraction to prevent BaseException errors with dummy text
-jest.unstable_mockModule('pdfjs-dist/legacy/build/pdf.mjs', () => ({
-  getDocument: jest.fn(() => ({
-    promise: Promise.resolve({
-      numPages: 1,
-      getPage: jest.fn(() => Promise.resolve({
-        getTextContent: jest.fn(() => Promise.resolve({
-          items: [{ str: "mocked resume text" }]
-        }))
-      }))
-    })
-  }))
-}));
-
-// Mock JWT Token Verification for standard middleware and controller
-jest.unstable_mockModule('jsonwebtoken', () => ({
-  default: {
-    verify: jest.fn((token, secret, options) => {
-      if (token === 'valid-refresh-token') {
-        return { userId: '660000000000000000000002', type: 'refresh' };
-      }
-      if (token === 'deactivated-refresh-token') {
-        return { userId: '660000000000000000000001', type: 'refresh' };
-      }
-      throw new Error('Invalid token');
-    }),
-    sign: jest.fn(() => 'mock-signed-token'),
-  }
-}));
-
-// 2. NOW WE CAN IMPORT THE ACTUAL MODULES
-import request from 'supertest';
-import express from 'express';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
-import User from '../models/user.model.js';
-import cookieParser from 'cookie-parser';
-
-const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
+// NOW IMPORT CONTROLLER
+const { googleAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
 const { generateQuestion, analyzeResume } = await import('../controllers/interview.controller.js');
-const { upload } = await import('../middleware/multer.js');
-
-const publicDir = path.resolve('public');
-if (!fs.existsSync(publicDir)) {
-  fs.mkdirSync(publicDir, { recursive: true });
-}
 
 const app = express();
 app.use(cookieParser());
@@ -99,6 +56,22 @@ app.get('/api/user/current-user', testAuthMiddleware, getCurrentUser);
 app.post('/api/interview/generate-question', testAuthMiddleware, generateQuestion);
 app.post('/api/interview/resume', testAuthMiddleware, upload.single('resume'), analyzeResume);
 app.post('/api/auth/refresh', refreshAuth);
+
+app.get('/api/user/current-user', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  next();
+}, getCurrentUser);
+
+app.post('/api/interview/generate-question', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  next();
+}, generateQuestion);
+
+app.post('/api/interview/resume', (req, res, next) => {
+  req.userId = '660000000000000000000001';
+  req.file = { path: 'mock-path.pdf' };
+  next();
+}, analyzeResume);
 
 let mongoServer;
 
@@ -317,6 +290,83 @@ describe('Security Hardening Deactivation Tests', () => {
       const hasRefreshToken = cookies.some(cookie => cookie.includes('refreshToken=') && !cookie.includes('refreshToken=;'));
       expect(hasToken).toBe(true);
       expect(hasRefreshToken).toBe(true);
+    });
+  });
+
+  describe('getCurrentUser Controller hardening', () => {
+    it('should reject deactivated users and clear session cookie', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .get('/api/user/current-user');
+
+      expect(response.status).toBe(401);
+      expect(response.body.message).toBe('Authentication required.');
+
+      const cookies = response.headers['set-cookie'];
+      expect(cookies).toBeDefined();
+      expect(cookies.some(c => c.includes('token=;'))).toBe(true);
+      expect(cookies.some(c => c.includes('refreshToken=;'))).toBe(true);
+    });
+
+    it('should allow active users', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Active User',
+        email: 'active@example.com',
+        isActive: true,
+      });
+
+      const response = await request(app)
+        .get('/api/user/current-user');
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe('Active User');
+      expect(response.body.isActive).toBeUndefined();
+    });
+  });
+
+  describe('generateQuestion Controller deactivation hardening', () => {
+    it('should reject deactivated users with 403', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .send({
+          role: 'Software Engineer',
+          experience: 'Senior',
+          mode: 'Technical',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+  });
+
+  describe('analyzeResume Controller deactivation hardening', () => {
+    it('should reject deactivated users with 403', async () => {
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Deactivated User',
+        email: 'deactivated@example.com',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/resume');
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
     });
   });
 });

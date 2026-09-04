@@ -22,13 +22,7 @@ export const analyzeResume = async (req, res) => {
     }
 
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user) {
-      if (filepath && fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-      return res.status(404).json({ message: "User not found" });
-    }
-    if (user.isActive === false) {
+    if (!user || user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
@@ -139,8 +133,8 @@ export const generateQuestion = async (req, res) => {
     if (mode === "System Design") dbMode = "SystemDesign";
 
     // PERFORMANCE OPTIMIZATION: Retrieve only required user fields (_id, name, email, credits, isActive)
-    // with .lean() to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
-    const user = await User.findById(req.userId).select("_id name email credits isActive").lean();
+    // to avoid fetching and hydrating unused fields, saving database bandwidth and server memory.
+    const user = await User.findById(req.userId).select("_id name email credits isActive");
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
