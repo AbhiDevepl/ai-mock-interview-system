@@ -76,8 +76,8 @@ export const googleAuth = async (req, res) => {
       return res.status(401).json({ message: "Authentication failed." });
     }
 
-    // Performance Optimization: Use .findOne().lean() to skip full Mongoose document hydration
-    // for existing user queries, and run updates atomically with findOneAndUpdate and .lean().
+    // PERFORMANCE OPTIMIZATION: Query with .lean() to bypass document hydration
+    // for read-only user checks on login.
     let user = await User.findOne({ email }).lean();
 
     if (!user) {
@@ -93,16 +93,18 @@ export const googleAuth = async (req, res) => {
       if (!user.isActive) {
         return res.status(403).json({ message: "This account has been deactivated." });
       }
-      const updateData = {};
+
+      const updateData = { lastLoginAt: new Date() };
       if (firebaseName && firebaseName !== user.name) updateData.name = firebaseName;
       if (firebasePicture && firebasePicture !== user.picture) updateData.picture = firebasePicture;
       if (firebaseUID && firebaseUID !== user.firebaseUID) updateData.firebaseUID = firebaseUID;
-      updateData.lastLoginAt = new Date();
 
+      // PERFORMANCE OPTIMIZATION: Perform an atomic findOneAndUpdate with .lean() to completely bypass
+      // Mongoose model hydration, change tracking, and save/validation hooks overhead on login updates.
       user = await User.findOneAndUpdate(
-        { email },
+        { _id: user._id },
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true }
       ).lean();
     }
 
