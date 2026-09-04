@@ -22,13 +22,17 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user) {
-      if (filepath && fs.existsSync(filepath)) fs.unlinkSync(filepath);
-      return res.status(404).json({ message: "User not found" });
+    const requestUser = await User.findById(req.userId).select("isActive").lean();
+    if (!requestUser) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(404).json({ message: "User not found." });
     }
-    if (user.isActive === false) {
-      if (filepath && fs.existsSync(filepath)) fs.unlinkSync(filepath);
+    if (requestUser.isActive === false) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
@@ -138,10 +142,13 @@ export const generateQuestion = async (req, res) => {
     // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
     // before calling the expensive AI service. This avoids fetching and hydrating
     // unused fields, saving database bandwidth and server memory, and avoids
-    // AI calls for users with insufficient credits.
+    // AI calls for users with insufficient credits. Also check user activation.
     const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
     if (!userPreCheck) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (userPreCheck.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
     }
     if (userPreCheck.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
@@ -293,6 +300,14 @@ export const submitAnswer = async (req, res) => {
 
     if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
       return res.status(400).json({ message: "Invalid interview ID format." });
+    }
+
+    const requestUser = await User.findById(req.userId).select("isActive").lean();
+    if (!requestUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (requestUser.isActive === false) {
+      return res.status(403).json({ message: "This account has been deactivated." });
     }
 
     // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)

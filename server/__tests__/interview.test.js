@@ -43,6 +43,47 @@ describe('Interview Controller Hardening & Validation', () => {
     await User.deleteMany({});
     await Interview.deleteMany({});
     jest.clearAllMocks();
+
+    // Create default active user to ensure checks pass
+    await User.create({
+      _id: '660000000000000000000001',
+      name: 'Default User',
+      email: 'default@example.com',
+      isActive: true,
+      credits: 100,
+    });
+  });
+
+  describe('POST /api/interview/resume', () => {
+    it('should reject deactivated users with 403 Forbidden and delete the uploaded file', async () => {
+      await User.deleteMany({});
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Banned User',
+        email: 'banned@example.com',
+        isActive: false,
+      });
+
+      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      const response = await request(app)
+        .post('/api/interview/resume')
+        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
+    it('should reject nonexistent users with 404 Not Found and delete the uploaded file', async () => {
+      await User.deleteMany({});
+
+      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      const response = await request(app)
+        .post('/api/interview/resume')
+        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe('User not found.');
+    });
   });
 
   describe('POST /api/interview/resume', () => {
@@ -87,6 +128,7 @@ describe('Interview Controller Hardening & Validation', () => {
     });
 
     it('should allow valid generation with standard inputs and map mode', async () => {
+      await User.deleteMany({});
       await User.create({
         _id: '660000000000000000000001',
         name: 'John Doe',
@@ -114,6 +156,42 @@ describe('Interview Controller Hardening & Validation', () => {
       const saved = await Interview.findById(response.body.interviewId);
       expect(saved).toBeDefined();
       expect(saved.mode).toBe('HR'); // Check mapping
+    });
+
+    it('should reject deactivated users with 403 Forbidden', async () => {
+      await User.deleteMany({});
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Banned User',
+        email: 'banned@example.com',
+        isActive: false,
+      });
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .send({
+          role: 'Frontend Developer',
+          experience: '3 years',
+          mode: 'Behavioral',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
+    it('should reject nonexistent users with 404 Not Found', async () => {
+      await User.deleteMany({});
+
+      const response = await request(app)
+        .post('/api/interview/generate-question')
+        .send({
+          role: 'Frontend Developer',
+          experience: '3 years',
+          mode: 'Behavioral',
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe('User not found.');
     });
 
     it('should reject invalid or missing fields', async () => {
@@ -158,6 +236,58 @@ describe('Interview Controller Hardening & Validation', () => {
   });
 
   describe('POST /api/interview/submit-answer', () => {
+    it('should reject deactivated users with 403 Forbidden', async () => {
+      await User.deleteMany({});
+      await User.create({
+        _id: '660000000000000000000001',
+        name: 'Banned User',
+        email: 'banned@example.com',
+        isActive: false,
+      });
+
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
+      });
+
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .send({
+          interviewId: interview._id,
+          questionIndex: 0,
+          answer: 'Test answer',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.message).toBe('This account has been deactivated.');
+    });
+
+    it('should reject nonexistent users with 404 Not Found', async () => {
+      await User.deleteMany({});
+
+      const interview = await Interview.create({
+        userId: '660000000000000000000001',
+        role: 'Frontend',
+        experience: 'Junior',
+        mode: 'Technical',
+        questions: [{ question: 'Q1', difficulty: 'easy', timeLimit: 60 }],
+      });
+
+      const response = await request(app)
+        .post('/api/interview/submit-answer')
+        .send({
+          interviewId: interview._id,
+          questionIndex: 0,
+          answer: 'Test answer',
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toBe('User not found.');
+    });
+
     it('should reject malformed interview ID', async () => {
       const response = await request(app)
         .post('/api/interview/submit-answer')

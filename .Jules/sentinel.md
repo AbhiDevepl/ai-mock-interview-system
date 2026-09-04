@@ -10,7 +10,12 @@
 **Learning:** Wrapping parameter verification inside a block that converts any caught error into a different exception can mask critical validation bugs and make tests/logic brittle.
 **Prevention:** Always set a strict timeout (e.g., 15000 ms) on external HTTP requests and ensure validation logic either sits outside the general `try-catch` block or has its errors explicitly bypassed so they are not swallowed.
 
-## 2026-08-04 - Metered API Access by Deactivated Users
-**Vulnerability:** Stateless JWT authentication successfully verified tokens for deactivated users without consulting the database status on each request. This allowed deactivated users to make authorized requests to metered endpoints (such as `generateQuestion`, `submitAnswer`, and `analyzeResume`), incurring third-party AI costs and accumulating temporary uploaded resume files on the server.
-**Learning:** Purely stateless token validation is insufficient for endpoints that trigger metered, rate-limited, or heavy asynchronous processes. The application must perform lightweight database status lookups (e.g. `isActive`) for critical actions even if the signature on the JWT is valid.
-**Prevention:** Always verify key authorization attributes (such as `isActive` or `role` status) against the database for high-cost metered operations. Additionally, ensure any temporary resources (like uploaded resume files) are immediately cleaned up (e.g., using `fs.unlinkSync`) before returning an authorization error response.
+## 2026-08-09 - Stateless Session Deactivation Deficit
+**Vulnerability:** Under standard stateless token systems (like JWT-based auth used here), deactivating a user account in the database does not automatically invalidate active access tokens. As a result, deactivated users could still successfully query their profiles at the `/api/user/current-user` endpoint using their active cookies, bypassing access revocation.
+**Learning:** Over-reliance on stateless JWT signature verification without explicit database status checks on user-profile or metered endpoints allows deactivated or banned users to continue accessing resources until their tokens expire.
+**Prevention:** Always query the user status (`isActive === false`) on key profile and resource endpoints, and force-clear the authentication cookies (`token`, `refreshToken`, `deviceId`) on the response if a deactivated session is detected.
+
+## 2026-08-10 - Resource Consumption via Stateless Bypassed Deactivation
+**Vulnerability:** Bypassing explicit database user activation checks on AI-intensive, metered endpoints (`/api/interview/resume`, `/api/interview/generate-question`, and `/api/interview/submit-answer`) allowed deactivated accounts with active JWT sessions to exploit system resources and consume AI credits/third-party API budget before session expiration.
+**Learning:** Verification of the JWT token signature alone is insufficient for billing or metered services, where immediate access revocation must be guaranteed for deactivated, suspended, or deleted accounts.
+**Prevention:** Perform explicit database checks (`isActive !== false`) on all metered or AI-driven endpoints, securely delete temporary local resources (such as uploaded files via `fs.unlinkSync`) immediately upon rejection, and return a robust `403 Forbidden` status.

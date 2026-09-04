@@ -1,0 +1,4 @@
+allowBuilds:
+  '@firebase/util': true
+  mongodb-memory-server: true
+  protobufjs: true
