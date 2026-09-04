@@ -365,7 +365,7 @@ function Step1SetUp({ onStart }) {
               <label htmlFor="resume-upload-trigger" className="block text-sm font-semibold text-gray-700 mb-1.5">
                 Resume
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex gap-2">
                 <button
                   id="resume-upload-trigger"
                   ref={uploadTriggerRef}
@@ -387,13 +387,14 @@ function Step1SetUp({ onStart }) {
                 {resumeFile && (
                   <button
                     type="button"
-                    aria-label="Clear uploaded resume"
-                    onClick={() => {
+                    aria-label="Remove selected resume"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setResumeFile(null);
                       setAnalysisResult(null);
                       setAnalysisStatus(null);
                     }}
-                    className="flex h-12 w-12 items-center justify-center rounded-xl border border-gray-200 text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 shrink-0"
+                    className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                   >
                     <FaTimes size={16} />
                   </button>
@@ -557,32 +558,29 @@ function Step1SetUp({ onStart }) {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
-                    <div className="mt-4 flex items-center justify-center gap-2">
+                    <div className="mt-4 flex gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
                       <motion.button
                         type="button"
                         whileHover={{ scale: 1.02 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUploadResume();
-                        }}
+                        onClick={handleUploadResume}
                         disabled={analyzing}
                         className="min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
                       >
                         {analyzing ? "Analyzing..." : "Analyze Resume"}
                       </motion.button>
-                      <button
+                      <motion.button
                         type="button"
-                        aria-label="Remove selected resume file"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        aria-label="Remove resume file"
+                        whileHover={{ scale: 1.02 }}
+                        onClick={() => {
                           setResumeFile(null);
                           setAnalysisResult(null);
                           setAnalysisStatus(null);
                         }}
-                        className="min-h-[44px] px-3.5 py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 transition text-sm font-medium"
+                        className="min-h-[44px] bg-red-50 text-red-600 border border-red-200 px-5 py-2.5 rounded-lg hover:bg-red-100 hover:text-red-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                       >
                         Remove
-                      </button>
+                      </motion.button>
                     </div>
                   )}
                 </>
