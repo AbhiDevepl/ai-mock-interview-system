@@ -393,14 +393,14 @@ function Step1SetUp({ onStart }) {
                 {resumeFile && (
                   <button
                     type="button"
-                    aria-label="Remove selected resume"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setResumeFile(null);
                       setAnalysisResult(null);
                       setAnalysisStatus(null);
+                      setAnalysisError("");
                     }}
-                    className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    aria-label="Remove uploaded resume"
+                    className="px-4 py-3 border border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 rounded-xl transition focus:outline-none focus-visible:ring-4 focus-visible:ring-red-500/20 flex items-center justify-center cursor-pointer"
                   >
                     <FaTimes size={16} />
                   </button>
@@ -560,6 +560,7 @@ function Step1SetUp({ onStart }) {
                 key={resumeFile ? resumeFile.name : "empty"}
                 type="file"
                 id="resumeUpload"
+                key={resumeFile ? resumeFile.name : "empty"}
                 accept="application/pdf"
                 className="hidden"
                 onChange={(e) => {
@@ -588,26 +589,32 @@ function Step1SetUp({ onStart }) {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">PDF up to 5MB</p>
                   {resumeFile && (
-                    <div className="mt-4 flex gap-2 justify-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-4 flex gap-2 justify-center w-full max-w-[280px] mx-auto">
                       <motion.button
                         type="button"
                         whileHover={{ scale: 1.02 }}
-                        onClick={handleUploadResume}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUploadResume();
+                        }}
                         disabled={analyzing}
-                        className="min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                        className="min-h-[44px] bg-gray-900 text-white px-5 py-2.5 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-black"
                       >
-                        {analyzing ? "Analyzing..." : "Analyze Resume"}
+                        {analyzing ? "Analyzing..." : "Analyze"}
                       </motion.button>
                       <motion.button
                         type="button"
-                        aria-label="Remove resume file"
                         whileHover={{ scale: 1.02 }}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setResumeFile(null);
                           setAnalysisResult(null);
                           setAnalysisStatus(null);
+                          setAnalysisError("");
                         }}
-                        className="min-h-[44px] bg-red-50 text-red-600 border border-red-200 px-5 py-2.5 rounded-lg hover:bg-red-100 hover:text-red-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                        disabled={analyzing}
+                        aria-label="Remove selected resume file"
+                        className="min-h-[44px] border border-red-200 hover:border-red-500 hover:bg-red-50 text-red-600 px-4 py-2.5 rounded-lg transition flex-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 cursor-pointer"
                       >
                         Remove
                       </motion.button>
