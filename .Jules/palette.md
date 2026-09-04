@@ -22,6 +22,14 @@ This journal records critical user experience and accessibility insights discove
 **Learning:** Custom visual cards acting as semantic radiogroups are common in personalized user flows but are inaccessible to screen readers and keyboard-only users by default. Implementing standard arrow key navigation (ArrowLeft/ArrowRight/ArrowUp/ArrowDown, Home, End) alongside a roaming tabIndex (where only the active element has `tabIndex={0}` and others have `tabIndex={-1}`) provides a standard, native-like, accessible keyboard interaction model.
 **Action:** Always implement standard arrow key handlers, unique focusable button IDs, roaming tabIndex, and group labeling (`aria-labelledby`) for custom radiogroup controls.
 
-## 2026-08-01 - Accessible Interactive Brand Logo Buttons
-**Learning:** Modern design patterns often treat header logos as non-interactive elements or non-semantic containers that are not reachable via screen-readers or keyboard tab order. Upgrading these to a standard, focusable `<button>` with explicit navigation logic, focus indicators, subtle hover highlights, and clear `aria-label`s creates a semantic and delightful navigation experience.
-**Action:** Ensure all interactive brand logo wrappers in navigations are implemented as focusable `<button>` tags with custom focus ring outlines (`focus-visible:ring-2`) and screen reader labels.
+## 2025-03-01 - Modal Overlay Focus Management
+**Learning:** Overlays and custom dialogue modals in React applications often trap keyboard focus naturally, but fail to reset focus when dismissing or shift focus correctly when initializing. Manually capturing the pre-modal trigger element and restoring focus to it, alongside trapping keyboard tab transitions inside the modal itself, completes the user journey for screen readers and power-users.
+**Action:** Always implement explicit ref tracking and manual `.focus()` handling inside modal mount/unmount and keyboard tab traps to ensure non-mouse users are never lost or stranded.
+
+## 2025-03-03 - Header Brand Logo Accessibility & Navigation semantics
+**Learning:** Interactive branding logos are often built as non-semantic layout elements with custom click listeners but without keyboard focus support, focus rings, hover styles, or screen-reader labels. Converting these branding wrappers into semantic `<button>` elements with exact routing navigation, transition hover highlights, negative-margin compensations, and unique focus rings significantly enhances screen-reader usability.
+**Action:** When designing header and footer brand logo links, convert them into semantic button or link tags, provide distinct hover transitions, compensate padding spacing with negative margins, and add high-contrast focus indicators (`focus-visible:ring-2`) and descriptive `aria-label` tags.
+
+## 2025-03-04 - Dynamic Timer ARIA Semantics & Visual Urgency Transitions
+**Learning:** SVG progress rings in countdown timers are unreadable by screen readers without explicit ARIA timer role attributes (`role="timer"`, `aria-live="polite"`, `aria-valuenow`, `aria-valuetext`). Additionally, static danger colors on healthy timers create false urgency. Dynamically transitioning text and path colors to alert tones only when remaining time crosses a low threshold (<= 10s) provides clear, accessible feedback.
+**Action:** When building visual timer or progress ring components, wrap them in a container with `role="timer"`, dynamic `aria-valuenow`/`aria-valuetext`, and transition stroke/text colors based on remaining progress threshold.
