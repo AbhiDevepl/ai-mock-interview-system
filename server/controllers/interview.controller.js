@@ -28,7 +28,13 @@ export const analyzeResume = async (req, res) => {
 
   try {
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
+    if (!user) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
@@ -39,21 +45,10 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "Resume required" });
     }
 
-    // Deactivation check: reject deactivated users to protect metered AI resources
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      if (filepath && fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
     const fileBuffer = await fs.promises.readFile(filepath);
     const uint8Array = new Uint8Array(fileBuffer);
     const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
 
-    // PERFORMANCE OPTIMIZATION: Parse PDF pages in parallel instead of sequentially.
-    // This reduces processing latency significantly for multi-page resumes.
     const pagePromises = Array.from({ length: pdf.numPages }, (_, i) => {
       const pageNum = i + 1;
       return pdf.getPage(pageNum).then(async (page) => {
@@ -66,7 +61,9 @@ export const analyzeResume = async (req, res) => {
     let resumeText = pagesTexts.join("\n").replace(/\s+/g, " ").trim();
 
     if (!resumeText) {
-      fs.unlinkSync(filepath);
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
       return res
         .status(422)
         .json({ message: "Could not extract text from PDF" });
@@ -91,7 +88,9 @@ export const analyzeResume = async (req, res) => {
       .trim();
     const parsed = JSON.parse(cleaned);
 
-    fs.unlinkSync(filepath);
+    if (filepath && fs.existsSync(filepath)) {
+      fs.unlinkSync(filepath);
+    }
 
     return res.status(200).json({
       role: parsed.role,
@@ -116,11 +115,19 @@ export const generateQuestion = async (req, res) => {
   try {
     const { role: rawRole, experience: rawExperience, mode: rawMode, projects, skills, resumeText } = req.body;
 
-    // Check if requesting user's account has been deactivated
-    const requestUserCheck = await User.findById(req.userId).select("isActive").lean();
-    if (requestUserCheck && requestUserCheck.isActive === false) {
+    const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
+    if (!userPreCheck) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (userPreCheck.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
+    if (userPreCheck.credits < 50) {
+      return res
+        .status(400)
+        .json({ message: "Not enough credits. Minimum 50 required." });
+    }
+
     const role = typeof rawRole === "string" ? rawRole.trim() : "";
     const experience = typeof rawExperience === "string" ? rawExperience.trim() : "";
     const mode = typeof rawMode === "string" ? rawMode.trim() : "";
@@ -146,39 +153,15 @@ export const generateQuestion = async (req, res) => {
       return res.status(400).json({ message: "Resume text must be a string under 100k characters." });
     }
 
-    // Map mode to valid DB enum values
     let dbMode = mode;
     if (mode === "Behavioral") dbMode = "HR";
     if (mode === "System Design") dbMode = "SystemDesign";
-
-    // PERFORMANCE OPTIMIZATION: Check credits using a fast, read-only lean query
-    // before calling the expensive AI service. This avoids fetching and hydrating
-    // unused fields, saving database bandwidth and server memory, and avoids
-    // AI calls for users with insufficient credits.
-    const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
-    if (!userPreCheck) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    if (userPreCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-    if (userPreCheck.credits < 50) {
-      return res
-        .status(400)
-        .json({ message: "Not enough credits. Minimum 50 required" });
-    }
-
-    // Now fetch full user data for the interview
-    const user = await User.findById(req.userId).select("_id name email credits").lean();
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
 
     const projectText =
       Array.isArray(projects) && projects.length ? projects.join(",") : "None";
     const skillText =
       Array.isArray(skills) && skills.length ? skills.join(",") : "None";
-    const sefeResume = resumeText?.trim() || "None";
+    const safeResumeText = resumeText?.trim() || "None";
 
     const userPrompt = `
     Role:${role}
@@ -186,7 +169,7 @@ export const generateQuestion = async (req, res) => {
     InterviewMode:${mode}
     Projects:${projectText}
     Skills:${skillText}
-    Resume:${resumeText}`;
+    Resume:${safeResumeText}`;
 
     if (!userPrompt.trim()) {
       return res.status(400).json({ message: "prompt is required" });
@@ -242,33 +225,48 @@ export const generateQuestion = async (req, res) => {
         .status(500)
         .json({ message: "Failed to generate questions from AI" });
     }
-    const questionsArray = aiResponse
-      .split("\n")
-      .map((q) => q.trim())
-      .filter((q) => q.length)
-      .slice(0, 5);
+
+    let questionsArray = [];
+    const cleaned = aiResponse
+      .replace(/^\s*```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (parsed && Array.isArray(parsed.questions)) {
+        questionsArray = parsed.questions
+          .filter((q) => typeof q === "string" && q.trim().length > 0)
+          .map((q) => q.trim())
+          .slice(0, 5);
+      }
+    } catch {
+      // Fallback to line-by-line parsing if JSON structure wasn't returned
+      questionsArray = aiResponse
+        .split("\n")
+        .map((q) => q.trim())
+        .filter((q) => q.length > 0 && !q.startsWith("{") && !q.startsWith("}"))
+        .slice(0, 5);
+    }
 
     if (questionsArray.length === 0) {
       return res.status(500).json({ message: "Failed to generate questions" });
     }
 
-    // PERFORMANCE OPTIMIZATION: State-changing DB operation (credit deduction) performed atomically.
-    // Uses findOneAndUpdate with $inc and .lean() to prevent concurrent update race conditions (double-spending)
-    // and completely bypass Mongoose model hydration and save/validation hooks overhead.
-    const user = await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       { _id: req.userId, credits: { $gte: 50 } },
       { $inc: { credits: -50 } },
       { new: true, select: "_id name email credits", lean: true }
     );
 
-    if (!user) {
+    if (!updatedUser) {
       const userExists = await User.findById(req.userId).select("_id").lean();
       if (!userExists) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ message: "User not found." });
       }
       return res
         .status(400)
-        .json({ message: "Not enough credits. Minimum 50 required" });
+        .json({ message: "Not enough credits. Minimum 50 required." });
     }
 
     const interview = await Interview.create({
@@ -283,7 +281,7 @@ export const generateQuestion = async (req, res) => {
       mode: dbMode,
       projects,
       skills,
-      resumeText: sefeResume,
+      resumeText: safeResumeText,
     });
 
     res.json({
@@ -301,51 +299,24 @@ export const generateQuestion = async (req, res) => {
 export const submitAnswer = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (user && user.isActive === false) {
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
     const { interviewId, questionIndex, answer, timeTaken } = req.body;
 
-    // Check if requesting user's account has been deactivated
-    const requestUserCheck = await User.findById(req.userId).select("isActive").lean();
-    if (requestUserCheck && requestUserCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
     if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
       return res.status(400).json({ message: "Invalid interview ID format." });
-    }
-
-    // Deactivation check: reject deactivated users to protect metered AI resources
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // as it is not needed here, saving network bandwidth and memory overhead.
-    // Also use .lean() to bypass document hydration overhead.
-    const interview = await Interview.findById(interviewId).select("-resumeText").lean();
-
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
-
-    if (interview.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized access." });
-    }
-
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
     }
 
     if (
       questionIndex === undefined ||
       typeof questionIndex !== "number" ||
       !Number.isInteger(questionIndex) ||
-      questionIndex < 0 || questionIndex >= interview.questions.length
+      questionIndex < 0
     ) {
       return res.status(400).json({ message: "Invalid question index." });
     }
@@ -362,13 +333,6 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
     }
 
-    const requestingUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestingUser && requestingUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
-    // PERFORMANCE OPTIMIZATION: Use .select("userId questions").lean() to bypass document hydration,
-    // saving considerable CPU/memory. Exclude heavy fields like 'resumeText' (which can be up to 100KB).
     const interview = await Interview.findById(interviewId).select("userId questions").lean();
 
     if (!interview) {
@@ -385,15 +349,7 @@ export const submitAnswer = async (req, res) => {
 
     const question = interview.questions[questionIndex];
 
-    // Verify that the requesting user's account is active to prevent unauthorized usage of LLM APIs
-    const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
     if (!answer) {
-      // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
-      // instead of hydrated save to skip Mongoose's full array tracking and validations.
       const updateQuery = {};
       updateQuery[`questions.${questionIndex}.score`] = 0;
       updateQuery[`questions.${questionIndex}.feedback`] = "No answer provided";
@@ -404,8 +360,6 @@ export const submitAnswer = async (req, res) => {
     }
 
     if (timeTaken > question.timeLimit) {
-      // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
-      // instead of hydrated save to skip Mongoose's full array tracking and validations.
       const updateQuery = {};
       updateQuery[`questions.${questionIndex}.score`] = 0;
       updateQuery[`questions.${questionIndex}.feedback`] = "Time limit exceeded";
@@ -468,7 +422,6 @@ export const submitAnswer = async (req, res) => {
     const aiResponse = await askAi(message);
     let parsedResponse;
     try {
-      // Clean possible Markdown JSON code block fences
       const cleaned = aiResponse
         .replace(/^\s*```(?:json)?\s*/i, "")
         .replace(/\s*```\s*$/i, "")
@@ -483,7 +436,6 @@ export const submitAnswer = async (req, res) => {
       return res.status(500).json({ message: "Invalid evaluation response from AI." });
     }
 
-    // Securely validate and clamp scores to ensure they are safe numbers within 0-10
     const sanitizeScore = (val) => {
       const num = Number(val);
       if (isNaN(num)) return 0;
@@ -495,12 +447,9 @@ export const submitAnswer = async (req, res) => {
     const correctness = sanitizeScore(parsedResponse.correctness);
     const score = sanitizeScore(parsedResponse.finalScore);
 
-    // Sanitize feedback to prevent stored XSS attacks and limit to 500 characters
     const rawFeedback = typeof parsedResponse.feedback === "string" ? parsedResponse.feedback : "";
     const feedback = rawFeedback.substring(0, 500).replace(/[<>]/g, "");
 
-    // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
-    // instead of hydrated save to skip Mongoose's full array tracking and validations.
     const updateQuery = {};
     updateQuery[`questions.${questionIndex}.confidence`] = confidence;
     updateQuery[`questions.${questionIndex}.communication`] = communication;
@@ -515,12 +464,15 @@ export const submitAnswer = async (req, res) => {
     console.log(err);
     return res.status(500).json({ message: "Failed to submit answer" });
   }
-}
+};
 
 export const finishInterview = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (user && user.isActive === false) {
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
@@ -530,8 +482,6 @@ export const finishInterview = async (req, res) => {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // and use .lean() to completely bypass Mongoose document hydration overhead.
     const interview = await Interview.findById(interviewId).select("-resumeText").lean();
     if (!interview) {
       return res.status(404).json({ message: "Interview not found" });
@@ -568,8 +518,6 @@ export const finishInterview = async (req, res) => {
           ? totelCorrectness / totalQuestion
           : 0;
        
-    // PERFORMANCE OPTIMIZATION: Persist updates atomically via updateOne to skip
-    // full serialization and Mongoose document validation overhead.
     await Interview.updateOne(
       { _id: interviewId },
       { $set: { finalScore, status: "complete" } }
