@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import femaleVideo from "../assets/Videos/female-ai.mp4?url";
 import maleVideo from "../assets/Videos/male-ai.mp4?url";
 import Timer from "./Timer.jsx";
 import { motion } from "motion/react";
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 import axios from "axios";
-import { BsArrowLeft } from "react-icons/bs";
+import { BsArrowRight } from "react-icons/bs";
+
+const ServerUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:8000";
 
 function Step2Interview({ interviewData = null, onFinish = null }) {
   const [isListening, setIsListening] = useState(false);
@@ -159,9 +161,23 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
         resolve();
       };
 
+      // Chrome stops speaking after ~15s unless resumed periodically
+      const keepAlive = setInterval(() => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.resume();
+        } else {
+          clearInterval(keepAlive);
+        }
+      }, 10000);
+
+      const clearKeepAlive = () => clearInterval(keepAlive);
+      utterance.addEventListener("end", clearKeepAlive);
+      utterance.addEventListener("error", clearKeepAlive);
+
       setSubtitle(text);
 
-      window.speechSynthesis.speak(utterance);
+      // Chrome ignores speak() fired in the same tick as cancel()
+      setTimeout(() => window.speechSynthesis.speak(utterance), 100);
     });
   };
 
@@ -232,12 +248,6 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
         return prev - 1;
       });
     }, 1000);
-
-    useEffecte(()=>{
-      if (!isIntroPhase && currentQuestion) {
-        setTimeLeft(currentQuestion.timeLeft || 60);
-      }
-    },[currentIndex])
 
     return () => clearInterval(timer);
   }, [isIntroPhase, currentIndex, currentQuestion, isSubmitting]);
@@ -367,7 +377,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
           answer,
           timeTaken:
             (currentQuestion.timeLimit) - timeLeft,
-        },{withCreadentials:true}
+        },{withCredentials: true}
       );
 
       setFeedback(
@@ -414,7 +424,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     setIsMicOn(false)
     try {
       const result = await axios.post(ServerUrl + "/api/interview/finish", {
-        interviewId }, {withCreadentials:true})
+        interviewId }, {withCredentials: true})
     } catch (error) {
       
     }
@@ -549,7 +559,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
             </motion.button>
 
             {onFinish && (
-              <button
+              <motion.button
                 onClick={onFinish}
                 disabled={isSubmitting}
                 whileTap={{scale: 0.95}}
@@ -557,7 +567,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
               disabled:bg-gray-500">
                 {isSubmitting?"Submitting...":
                 "Finish"}
-              </button>
+              </motion.button>
             )}
 
           </div>):(
