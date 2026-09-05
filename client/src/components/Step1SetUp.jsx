@@ -13,6 +13,20 @@ import axios from "axios";
 import { serverUrl } from "../config";
 import { useSelector, useDispatch } from "react-redux";
 import { setUserData } from "../redux/userSlice";
+// Must match the contract enforced by POST /api/interview/generate-question.
+const MAX_LIST_ITEMS = 15;
+const MAX_TEXT_LENGTH = 100;
+
+// analyzeResume already returns data within these limits, but the value reaching
+// here is whatever that response held, so clean it before sending rather than
+// letting the API 400.
+const toCleanList = (value) =>
+  (Array.isArray(value) ? value : [])
+    .filter((item) => typeof item === "string")
+    .map((item) => item.trim().slice(0, MAX_TEXT_LENGTH))
+    .filter(Boolean)
+    .slice(0, MAX_LIST_ITEMS);
+
 const MODES = [
   { id: "Technical", label: "Technical", icon: FaBriefcase },
   { id: "Behavioral", label: "Behavioral", icon: FaUserTie },
@@ -28,32 +42,6 @@ function Step1SetUp({ onStart }) {
   const [mode, setMode] = useState("Technical");
   const [errors, setErrors] = useState({});
 
-  const handleModeKeyDown = (e) => {
-    const currentIndex = MODES.findIndex((m) => m.id === mode);
-    let nextIndex = currentIndex;
-
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault();
-      nextIndex = (currentIndex + 1) % MODES.length;
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      nextIndex = (currentIndex - 1 + MODES.length) % MODES.length;
-    } else if (e.key === "Home") {
-      e.preventDefault();
-      nextIndex = 0;
-    } else if (e.key === "End") {
-      e.preventDefault();
-      nextIndex = MODES.length - 1;
-    } else {
-      return;
-    }
-
-    const nextMode = MODES[nextIndex].id;
-    setMode(nextMode);
-    setTimeout(() => {
-      document.getElementById(`mode-btn-${nextMode}`)?.focus();
-    }, 0);
-  };
   const [resumeFile, setResumeFile] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -82,6 +70,7 @@ function Step1SetUp({ onStart }) {
   };
   const [analysisStatus, setAnalysisStatus] = useState(null); // null | "success" | "error"
   const [analysisError, setAnalysisError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
 
@@ -95,7 +84,6 @@ function Step1SetUp({ onStart }) {
     setAnalysisError("");
   };
 
-  const modalRef = React.useRef(null);
   const previousFocusRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -204,11 +192,12 @@ function Step1SetUp({ onStart }) {
   };
 
   const handleStart = async () => {
+    if (!validate()) return;
     setLoading(true);
     try {
       const resumeText = analysisResult?.resumeText || "";
-      const skills = analysisResult?.skills || [];
-      const projects = analysisResult?.projects || [];
+      const skills = toCleanList(analysisResult?.skills);
+      const projects = toCleanList(analysisResult?.projects);
       const result = await axios.post(
         `${serverUrl}/api/interview/generate-question`,
         { role, experience, mode, resumeText, skills, projects },
@@ -222,6 +211,11 @@ function Step1SetUp({ onStart }) {
       onStart(result.data);
     } catch (error) {
       console.log("generate-question error:", error.response?.data || error.message);
+      setErrors({
+        submit:
+          error.response?.data?.message ||
+          "Could not start the interview. Please try again.",
+      });
       setLoading(false);
     }
   };
@@ -388,12 +382,11 @@ function Step1SetUp({ onStart }) {
                         ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
                         : "border-gray-200 hover:border-emerald-300 text-gray-600"
                       }`}
-                    >
-                      <m.icon className="text-xl" />
-                      <span className="font-medium text-sm">{m.label}</span>
-                    </button>
-                  );
-                })}
+                  >
+                    <m.icon className="text-xl" />
+                    <span className="font-medium text-sm">{m.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -475,6 +468,11 @@ function Step1SetUp({ onStart }) {
             </motion.div>
           )}
           <div className="mt-6">
+            {errors.submit && (
+              <p className="mb-3 text-sm text-red-500 text-center" role="alert">
+                {errors.submit}
+              </p>
+            )}
             <motion.button
               onClick={handleStart}
               disabled={!role || !experience || loading}

@@ -19,11 +19,9 @@ describe('openRouter Service (askAi) Security Hardening', () => {
   it('should make a post request with a strict timeout configuration', async () => {
     mockPost.mockResolvedValue({
       data: {
-        choices: [
+        candidates: [
           {
-            message: {
-              content: 'Mocked AI Response',
-            },
+            content: { parts: [{ text: 'Mocked AI Response' }] },
           },
         ],
       },
@@ -35,13 +33,13 @@ describe('openRouter Service (askAi) Security Hardening', () => {
     expect(response).toBe('Mocked AI Response');
     expect(mockPost).toHaveBeenCalledTimes(1);
     expect(mockPost).toHaveBeenCalledWith(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.3-70b-versatile',
-        messages,
-      },
+      expect.stringContaining('generativelanguage.googleapis.com/v1beta/models/'),
       expect.objectContaining({
-        timeout: 15000,
+        contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+        generationConfig: { thinkingConfig: { thinkingLevel: 'low' } },
+      }),
+      expect.objectContaining({
+        timeout: 45000,
         headers: expect.any(Object),
       })
     );
@@ -51,7 +49,7 @@ describe('openRouter Service (askAi) Security Hardening', () => {
     mockPost.mockRejectedValue(new Error('Timeout / Network Error'));
 
     const messages = [{ role: 'user', content: 'Hello' }];
-    await expect(askAi(messages)).rejects.toThrow('Groq API Error');
+    await expect(askAi(messages)).rejects.toThrow('Gemini API Error');
   });
 
   it('should throw an error if messages parameter is empty or invalid', async () => {

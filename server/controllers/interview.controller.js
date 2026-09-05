@@ -6,14 +6,31 @@ import { askAi } from "../services/openRouter.service.js";
 import Interview from "../models/interview.model.js";
 import User from "../models/user.model.js";
 
-const UPLOAD_ROOT = path.resolve(process.cwd(), "uploads");
+const UPLOAD_ROOT = path.resolve(process.cwd(), "public");
+
+// The contract shared by analyzeResume's output and generateQuestion's input.
+// analyzeResume feeds generateQuestion directly, so both must agree on these.
+const MAX_LIST_ITEMS = 15;
+const MAX_TEXT_LENGTH = 100;
+
+// AI output is untrusted shape: coerce to the list contract above.
+const toCleanList = (value) =>
+  (Array.isArray(value) ? value : [])
+    .filter((item) => typeof item === "string")
+    .map((item) => item.trim().slice(0, MAX_TEXT_LENGTH))
+    .filter(Boolean)
+    .slice(0, MAX_LIST_ITEMS);
+
+const toCleanText = (value) =>
+  typeof value === "string" ? value.trim().slice(0, MAX_TEXT_LENGTH) : "";
 
 const getSafeUploadPath = (inputPath) => {
   if (!inputPath || typeof inputPath !== "string") return null;
 
-  const resolvedPath = path.isAbsolute(inputPath)
-    ? path.resolve(inputPath)
-    : path.resolve(UPLOAD_ROOT, inputPath);
+  // multer's diskStorage gives a path relative to the process cwd ("public/<file>"),
+  // so relative input must resolve against cwd - resolving against UPLOAD_ROOT
+  // would produce "public/public/<file>", which does not exist.
+  const resolvedPath = path.resolve(process.cwd(), inputPath);
 
   const relative = path.relative(UPLOAD_ROOT, resolvedPath);
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
@@ -27,6 +44,11 @@ export const analyzeResume = async (req, res) => {
   const filepath = getSafeUploadPath(req.file?.path);
 
   try {
+    if (req.file && !filepath) {
+      console.error("Resume analysis: upload path outside upload root:", req.file.path);
+      return res.status(400).json({ message: "Invalid resume upload path" });
+    }
+
     const user = await User.findById(req.userId).select("isActive").lean();
     if (!user || user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
@@ -37,15 +59,6 @@ export const analyzeResume = async (req, res) => {
 
     if (!req.file) {
       return res.status(400).json({ message: "Resume required" });
-    }
-
-    // Deactivation check: reject deactivated users to protect metered AI resources
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      if (filepath && fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-      return res.status(403).json({ message: "This account has been deactivated." });
     }
 
     const fileBuffer = await fs.promises.readFile(filepath);
@@ -76,7 +89,11 @@ export const analyzeResume = async (req, res) => {
       {
         role: "system",
         content:
-          'Extract structured data from resume. Return strictly JSON: {"role": "string", "experience": "string", "projects": ["project1", "project2"], "skills": ["skill1", "skill2"]}',
+          'Extract structured data from resume. Return strictly JSON: ' +
+          '{"role": "string", "experience": "string", "projects": ["project1"], "skills": ["skill1"]}. ' +
+          'Rules: "role" is a job title under 100 characters. "experience" is a short phrase such as ' +
+          '"2 years" or "Fresher", under 100 characters - not a description. "projects" and "skills" ' +
+          'are each at most 15 of the most relevant entries, every entry a string under 100 characters.',
       },
       {
         role: "user",
@@ -93,11 +110,14 @@ export const analyzeResume = async (req, res) => {
 
     fs.unlinkSync(filepath);
 
+    // The model does not reliably honour the limits above (a real resume yields
+    // ~30 skills), so enforce the contract here rather than letting
+    // generate-question reject the payload we just handed the client.
     return res.status(200).json({
-      role: parsed.role,
-      experience: parsed.experience,
-      projects: parsed.projects,
-      skills: parsed.skills,
+      role: toCleanText(parsed.role),
+      experience: toCleanText(parsed.experience),
+      projects: toCleanList(parsed.projects),
+      skills: toCleanList(parsed.skills),
       resumeText,
     });
   } catch (error) {
@@ -108,7 +128,35 @@ export const analyzeResume = async (req, res) => {
       "Resume analysis error:",
       error.response?.data || error.stack || error.message,
     );
-    return res.status(500).json({ message: "Failed to analyze resume" });
+
+    // A file we cannot parse is a bad request, not a server fault.
+    if (error?.name === "InvalidPDFException" || /Invalid PDF/i.test(error.message || "")) {
+      return res.status(422).json({ message: "Could not read the PDF. Please upload a valid PDF resume." });
+    }
+
+    // Out of AI quota is not a server fault and is actionable by the operator.
+    if (error?.status === 429) {
+      return res.status(429).json({
+        message: "AI quota exceeded. Please try again later.",
+        ...(process.env.NODE_ENV !== "production" && { error: error.upstreamMessage }),
+      });
+    }
+
+    // Upstream AI failures (and unparseable AI output) are not our fault: 502.
+    const isUpstream =
+      error instanceof SyntaxError || /API Error|empty response/i.test(error.message || "");
+    const status = isUpstream ? 502 : 500;
+    const message = isUpstream
+      ? "Resume analysis service is unavailable. Please try again."
+      : "Failed to analyze resume";
+
+    return res.status(status).json({
+      message,
+      // Never leak stack traces, keys or resume contents to clients in production.
+      ...(process.env.NODE_ENV !== "production" && {
+        error: error.upstreamMessage || error.message,
+      }),
+    });
   }
 };
 
@@ -116,19 +164,14 @@ export const generateQuestion = async (req, res) => {
   try {
     const { role: rawRole, experience: rawExperience, mode: rawMode, projects, skills, resumeText } = req.body;
 
-    // Check if requesting user's account has been deactivated
-    const requestUserCheck = await User.findById(req.userId).select("isActive").lean();
-    if (requestUserCheck && requestUserCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
     const role = typeof rawRole === "string" ? rawRole.trim() : "";
     const experience = typeof rawExperience === "string" ? rawExperience.trim() : "";
     const mode = typeof rawMode === "string" ? rawMode.trim() : "";
 
-    if (!role || role.length > 100) {
+    if (!role || role.length > MAX_TEXT_LENGTH) {
       return res.status(400).json({ message: "Role is required and must be under 100 characters." });
     }
-    if (!experience || experience.length > 100) {
+    if (!experience || experience.length > MAX_TEXT_LENGTH) {
       return res.status(400).json({ message: "Experience is required and must be under 100 characters." });
     }
     const allowedModes = ["Technical", "Behavioral", "System Design", "HR", "SystemDesign"];
@@ -136,10 +179,10 @@ export const generateQuestion = async (req, res) => {
       return res.status(400).json({ message: "Invalid or missing interview mode." });
     }
 
-    if (projects !== undefined && (!Array.isArray(projects) || projects.length > 15 || projects.some(p => typeof p !== "string" || p.length > 100))) {
+    if (projects !== undefined && (!Array.isArray(projects) || projects.length > MAX_LIST_ITEMS || projects.some(p => typeof p !== "string" || p.length > MAX_TEXT_LENGTH))) {
       return res.status(400).json({ message: "Projects must be an array of up to 15 strings (max 100 chars each)." });
     }
-    if (skills !== undefined && (!Array.isArray(skills) || skills.length > 15 || skills.some(s => typeof s !== "string" || s.length > 100))) {
+    if (skills !== undefined && (!Array.isArray(skills) || skills.length > MAX_LIST_ITEMS || skills.some(s => typeof s !== "string" || s.length > MAX_TEXT_LENGTH))) {
       return res.status(400).json({ message: "Skills must be an array of up to 15 strings (max 100 chars each)." });
     }
     if (resumeText !== undefined && (typeof resumeText !== "string" || resumeText.length > 100000)) {
@@ -166,12 +209,6 @@ export const generateQuestion = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Not enough credits. Minimum 50 required" });
-    }
-
-    // Now fetch full user data for the interview
-    const user = await User.findById(req.userId).select("_id name email credits").lean();
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
     }
 
     const projectText =
@@ -242,8 +279,24 @@ export const generateQuestion = async (req, res) => {
         .status(500)
         .json({ message: "Failed to generate questions from AI" });
     }
-    const questionsArray = aiResponse
-      .split("\n")
+    // The prompt asks for {"questions": [...]}, so parse it as JSON. Splitting on
+    // newlines turned the JSON envelope itself into questions ("{", "\"questions\": [").
+    const cleanedResponse = aiResponse
+      .replace(/^\s*```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+
+    let rawQuestions;
+    try {
+      const parsed = JSON.parse(cleanedResponse);
+      rawQuestions = Array.isArray(parsed) ? parsed : parsed?.questions;
+    } catch {
+      // Model ignored the JSON instruction: fall back to one question per line.
+      rawQuestions = cleanedResponse.split("\n");
+    }
+
+    const questionsArray = (Array.isArray(rawQuestions) ? rawQuestions : [])
+      .filter((q) => typeof q === "string")
       .map((q) => q.trim())
       .filter((q) => q.length)
       .slice(0, 5);
@@ -255,13 +308,13 @@ export const generateQuestion = async (req, res) => {
     // PERFORMANCE OPTIMIZATION: State-changing DB operation (credit deduction) performed atomically.
     // Uses findOneAndUpdate with $inc and .lean() to prevent concurrent update race conditions (double-spending)
     // and completely bypass Mongoose model hydration and save/validation hooks overhead.
-    const user = await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       { _id: req.userId, credits: { $gte: 50 } },
       { $inc: { credits: -50 } },
       { new: true, select: "_id name email credits", lean: true }
     );
 
-    if (!user) {
+    if (!updatedUser) {
       const userExists = await User.findById(req.userId).select("_id").lean();
       if (!userExists) {
         return res.status(404).json({ message: "User not found" });
@@ -307,25 +360,10 @@ export const submitAnswer = async (req, res) => {
 
     const { interviewId, questionIndex, answer, timeTaken } = req.body;
 
-    // Check if requesting user's account has been deactivated
-    const requestUserCheck = await User.findById(req.userId).select("isActive").lean();
-    if (requestUserCheck && requestUserCheck.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
     if (!interviewId || !mongoose.Types.ObjectId.isValid(interviewId)) {
       return res.status(400).json({ message: "Invalid interview ID format." });
     }
 
-    // Deactivation check: reject deactivated users to protect metered AI resources
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
-    // PERFORMANCE OPTIMIZATION: Exclude 'resumeText' (which can be up to 100KB)
-    // as it is not needed here, saving network bandwidth and memory overhead.
-    // Also use .lean() to bypass document hydration overhead.
     const interview = await Interview.findById(interviewId).select("-resumeText").lean();
 
     if (!interview) {
@@ -334,11 +372,6 @@ export const submitAnswer = async (req, res) => {
 
     if (interview.userId.toString() !== req.userId) {
       return res.status(403).json({ message: "Unauthorized access." });
-    }
-
-    const requestUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestUser && requestUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
     }
 
     if (
@@ -362,34 +395,7 @@ export const submitAnswer = async (req, res) => {
       return res.status(400).json({ message: "Answer must be a string under 5000 characters." });
     }
 
-    const requestingUser = await User.findById(req.userId).select("isActive").lean();
-    if (requestingUser && requestingUser.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
-
-    // PERFORMANCE OPTIMIZATION: Use .select("userId questions").lean() to bypass document hydration,
-    // saving considerable CPU/memory. Exclude heavy fields like 'resumeText' (which can be up to 100KB).
-    const interview = await Interview.findById(interviewId).select("userId questions").lean();
-
-    if (!interview) {
-      return res.status(404).json({ message: "Interview not found" });
-    }
-
-    if (interview.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: "Unauthorized access." });
-    }
-
-    if (questionIndex >= interview.questions.length) {
-      return res.status(400).json({ message: "Invalid question index." });
-    }
-
     const question = interview.questions[questionIndex];
-
-    // Verify that the requesting user's account is active to prevent unauthorized usage of LLM APIs
-    const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
-      return res.status(403).json({ message: "This account has been deactivated." });
-    }
 
     if (!answer) {
       // PERFORMANCE OPTIMIZATION: Use high-performance positional atomic updates
