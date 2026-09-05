@@ -138,6 +138,8 @@ export const getMe = async (req, res) => {
 
     if (!user || !user.isActive) {
       res.clearCookie("token", COOKIE_OPTIONS);
+      res.clearCookie("refreshToken", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       return res.status(401).json({ message: "Authentication required." });
     }
 
