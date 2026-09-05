@@ -537,6 +537,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
               setAnswer(e.target.value)
             }
             placeholder="Type Your Answer Here..."
+            aria-label="Your Answer"
             className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800"
           />
 
@@ -545,6 +546,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
             <motion.button
               onClick={toggleMic}
               whileTap={{ scale: 0.9 }}
+              aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
               className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
                 isListening
                   ? "bg-emerald-600"
