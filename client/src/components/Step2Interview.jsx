@@ -1,18 +1,17 @@
 import React from "react";
-import femaleVideo from "../assets/Videos/female-ai.mp4?url";
-import Timer from "./Timer.jsx";
+import maleVideo from "../assets/Videos/male-ai.mp4?url"
+import femaleVideo from "../assets/Videos/female-ai.mp4?url"
+import Timer from "./Timer.jsx"
 
-function Step2Interview({ interviewData = null, onFinish = null }) {
-  // Use properties to avoid ESLint unused variables errors
-  console.log("Interview started:", { interviewData, onFinish });
+function Step2Interview({ interviewData, onFinish }) {
+  //const { interviewId, questions, userName } = interviewData;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-100 flex items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-[1400px] min-h-[80vh] bg-white rounded-3xl shadow-2xl border border-gray-200 flex flex-col lg:flex-row overflow-hidden">
+      <div className="w-full max-w-[1400px] min-h-[80vh] bg-white rounded-3xl shadow-2xl border border-gray-200 flex felx-col lg:flex-row overflow-hidden">
         <div className="w-full lg:w-[35%] bg-white flex flex-col items-center p-6 space-y-6 border-r border-gray-200">
           <div className="w-full max-w-md rounded-2xl overflow-hidden shadow-xl">
-            <video
-              src={femaleVideo}
+          <video src={femaleVideo}
               muted
               playsInline
               preload="auto"
@@ -29,7 +28,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
               </div>
               <div className="h-px bg-gray-200"></div>
               <div className="flex justify-center">
-                <Timer timeLeft={0} totalTime={0} />
+                <Timer timeLeft={""} totelTime={""}/>
               </div>
             </div>
           </div>
