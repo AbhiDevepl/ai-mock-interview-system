@@ -545,7 +545,8 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
             <motion.button
               onClick={toggleMic}
               whileTap={{ scale: 0.9 }}
-              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
+              aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
+              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
                 isListening
                   ? "bg-emerald-600"
                   : "bg-black"
