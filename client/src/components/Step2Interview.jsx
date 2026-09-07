@@ -91,6 +91,49 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     };
   }, [currentIndex]);
 
+  const startMic = () => {
+    if (
+      recognitionRef.current &&
+      !isAIPlaying &&
+      isMicOn
+    ) {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.warn("Speech recognition could not start:", error);
+      }
+    }
+  };
+
+  const stopMic = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // Recognition may already be stopped
+      }
+
+      setIsListening(false);
+    }
+  };
+
+  const toggleMic = () => {
+    if (isMicOn) {
+      stopMic();
+      setIsMicOn(false);
+      setIsListening(false);
+    } else {
+      setIsMicOn(true);
+
+      if (!isAIPlaying) {
+        setTimeout(() => {
+          startMic();
+        }, 100);
+      }
+    }
+  };
+
   // Speak text using browser speech synthesis
   const speakText = (text) => {
     return new Promise((resolve) => {
@@ -106,9 +149,9 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
         .replace(/,/g, ", ...")
         .replace(/\./g, ". .")
         .replace(/\?/g, "? .")
-        .replace(/\!/g, "! .")
-        .replace(/\;/g, "; .")
-        .replace(/\:/g, ": .")
+        .replace(/!/g, "! .")
+        .replace(/;/g, "; .")
+        .replace(/:/g, ": .")
         .replace(/"/g, '" .')
         .replace(/'/g, "' .")
         .replace(/\(/g, "( .");
@@ -219,24 +262,13 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     };
 
     runIntro();
-  }, [
-    selectedVoice,
-    currentIndex,
-    isIntroPhase,
-  ]);
-
-  // Reset timer whenever question changes
-  useEffect(() => {
-    if (currentQuestion) {
-      setTimeLeft(currentQuestion.timeLimit || 60);
-    }
-  }, [currentIndex, currentQuestion]);
+  }, [selectedVoice, currentIndex, isIntroPhase]);
 
   // Question timer
   useEffect(() => {
     if (isIntroPhase) return;
     if (!currentQuestion) return;
-    if(isSubmitting) return;
+    if (isSubmitting) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -306,7 +338,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     return () => {
       try {
         recognition.stop();
-      } catch (error) {
+      } catch {
         // Recognition may already be stopped
       }
 
@@ -314,49 +346,22 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     };
   }, []);
 
-  const startMic = () => {
-    if (
-      recognitionRef.current &&
-      !isAIPlaying &&
-      isMicOn
-    ) {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (error) {
-        // Browser throws if recognition is already running
-        console.warn(
-          "Speech recognition could not start:",
-          error
-        );
+  const finishInterview = async () => {
+    stopMic();
+    setIsMicOn(false);
+    try {
+      const response = await axios.post(
+        ServerUrl + "/api/interview/finish",
+        { interviewId },
+        { withCredentials: true }
+      );
+      if (onFinish) {
+        onFinish(response?.data);
       }
-    }
-  };
-
-  const stopMic = () => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (error) {
-        // Recognition may already be stopped
-      }
-
-      setIsListening(false);
-    }
-  };
-
-  const toggleMic = () => {
-    if (isMicOn) {
-      stopMic();
-      setIsMicOn(false);
-      setIsListening(false);
-    } else {
-      setIsMicOn(true);
-
-      if (!isAIPlaying) {
-        setTimeout(() => {
-          startMic();
-        }, 100);
+    } catch (error) {
+      console.error("Error finishing interview:", error);
+      if (onFinish) {
+        onFinish();
       }
     }
   };
@@ -376,20 +381,16 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
           questionIndex: currentIndex,
           answer,
           timeTaken:
-            (currentQuestion.timeLimit) - timeLeft,
-        },{withCredentials: true}
+            (currentQuestion.timeLimit || 60) - timeLeft,
+        },
+        { withCredentials: true }
       );
 
       setFeedback(
         result?.data?.feedback || ""
       );
 
-      // Move to next question
-      if (currentIndex < questions.length - 1) {
-        setAnswer("");
-        setFeedback("");
-        setCurrentIndex((prev) => prev + 1);
-      } else {
+      if (currentIndex >= questions.length - 1) {
         if (onFinish) {
           onFinish(result?.data);
         }
@@ -403,32 +404,24 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
       setIsSubmitting(false);
     }
   };
-  const handleNext = async ()=> {
-    setAnswer("")
-    setFeedback("")
+
+  const handleNext = async () => {
+    setAnswer("");
+    setFeedback("");
 
     if (currentIndex + 1 >= questions.length) {
-      finishInterview();
+      await finishInterview();
       return;
     }
+    const nextQ = questions[currentIndex + 1];
+    setTimeLeft(nextQ?.timeLimit || 60);
     await speakText("Alright, let's move to the next question.");
 
-    setCurrentIndex(currentIndex + 1);
-    setTimeout(()=>{
+    setCurrentIndex((prev) => prev + 1);
+    setTimeout(() => {
       if (isMicOn) startMic();
-    },500);
-  }
-
-  const finishInterview = async () =>{
-    stopMic()
-    setIsMicOn(false)
-    try {
-      const result = await axios.post(ServerUrl + "/api/interview/finish", {
-        interviewId }, {withCredentials: true})
-    } catch (error) {
-      
-    }
-  }
+    }, 500);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-100 flex items-center justify-center p-4 sm:p-6">
@@ -531,62 +524,75 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
           </div>
 
+          <label htmlFor="interview-answer-input" className="sr-only">
+            Your Answer
+          </label>
           <textarea
+            id="interview-answer-input"
+            aria-label="Your Answer"
             value={answer}
-            onChange={(e) =>
-              setAnswer(e.target.value)
-            }
+            onChange={(e) => setAnswer(e.target.value)}
             placeholder="Type Your Answer Here..."
             className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800"
           />
 
-          {!feedback ? (<div className="flex items-center gap-4 mt-6">
-
-            <motion.button
-              onClick={toggleMic}
-              whileTap={{ scale: 0.9 }}
-              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
-                isListening
-                  ? "bg-emerald-600"
-                  : "bg-black"
-              } text-white`}
-            >
-              {isMicOn ? (
-                <FaMicrophone size={20} />
-              ) : (
-                <FaMicrophoneSlash size={20} />
-              )}
-            </motion.button>
-
-            {onFinish && (
+          {!feedback ? (
+            <div className="flex items-center gap-4 mt-6">
               <motion.button
-                onClick={onFinish}
-                disabled={isSubmitting}
-                whileTap={{scale: 0.95}}
-                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition
-              disabled:bg-gray-500">
-                {isSubmitting?"Submitting...":
-                "Finish"}
-              </motion.button>
-            )}
-
-          </div>):(
-              <motion.div
-              initial={{opacity:0}}
-              animate={{opacity:1}}
-              className="mt-6 bg-emerald-50 border border-emerald-200 p-5 rounded-2xl shadow-sm"
+                type="button"
+                onClick={toggleMic}
+                whileTap={{ scale: 0.9 }}
+                aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
+                aria-pressed={isMicOn}
+                className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
+                  isListening ? "bg-emerald-600" : "bg-black"
+                } text-white`}
               >
-                <p className="text-emerald-700 font-medium mb-4">
-                  {feedback}
-                </p>
-                <button
+                {isMicOn ? (
+                  <FaMicrophone size={20} />
+                ) : (
+                  <FaMicrophoneSlash size={20} />
+                )}
+              </motion.button>
+
+              <motion.button
+                type="button"
+                onClick={submitAnswer}
+                disabled={isSubmitting || !answer.trim()}
+                whileTap={{ scale: 0.95 }}
+                className="px-5 py-2.5 rounded-full bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 cursor-pointer"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Answer"}
+              </motion.button>
+
+              {onFinish && (
+                <motion.button
+                  type="button"
+                  onClick={finishInterview}
+                  disabled={isSubmitting}
+                  whileTap={{ scale: 0.95 }}
+                  className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition disabled:bg-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 cursor-pointer"
+                >
+                  Finish
+                </motion.button>
+              )}
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-6 bg-emerald-50 border border-emerald-200 p-5 rounded-2xl shadow-sm"
+            >
+              <p className="text-emerald-700 font-medium mb-4">{feedback}</p>
+              <button
+                type="button"
                 onClick={handleNext}
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 
-                rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1">
-                  Next Question <BsArrowRight size={18}/>
-                </button>
-              </motion.div>
-            )}
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 cursor-pointer"
+              >
+                Next Question <BsArrowRight size={18} />
+              </button>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

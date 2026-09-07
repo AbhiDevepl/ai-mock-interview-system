@@ -130,8 +130,6 @@ function Step1SetUp({ onStart }) {
       }
     };
 
-    const currentTrigger = uploadTriggerRef.current;
-
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
