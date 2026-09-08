@@ -531,7 +531,11 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
           </div>
 
+          <label htmlFor="user-answer" className="sr-only">
+            Your Answer
+          </label>
           <textarea
+            id="user-answer"
             value={answer}
             onChange={(e) =>
               setAnswer(e.target.value)
@@ -543,9 +547,11 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
           {!feedback ? (<div className="flex items-center gap-4 mt-6">
 
             <motion.button
+              type="button"
               onClick={toggleMic}
               whileTap={{ scale: 0.9 }}
-              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
+              aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
+              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
                 isListening
                   ? "bg-emerald-600"
                   : "bg-black"
@@ -560,11 +566,11 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
             {onFinish && (
               <motion.button
+                type="button"
                 onClick={onFinish}
                 disabled={isSubmitting}
                 whileTap={{scale: 0.95}}
-                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition
-              disabled:bg-gray-500">
+                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 cursor-pointer disabled:bg-gray-500 disabled:cursor-not-allowed">
                 {isSubmitting?"Submitting...":
                 "Finish"}
               </motion.button>
