@@ -543,9 +543,12 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
           {!feedback ? (<div className="flex items-center gap-4 mt-6">
 
             <motion.button
+              type="button"
               onClick={toggleMic}
               whileTap={{ scale: 0.9 }}
-              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
+              aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
+              title={isMicOn ? "Mute microphone" : "Unmute microphone"}
+              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
                 isListening
                   ? "bg-emerald-600"
                   : "bg-black"
@@ -560,10 +563,12 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
             {onFinish && (
               <motion.button
+                type="button"
                 onClick={onFinish}
                 disabled={isSubmitting}
                 whileTap={{scale: 0.95}}
-                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition
+                aria-label="Finish interview"
+                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2
               disabled:bg-gray-500">
                 {isSubmitting?"Submitting...":
                 "Finish"}
@@ -580,9 +585,11 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
                   {feedback}
                 </p>
                 <button
+                type="button"
                 onClick={handleNext}
+                aria-label="Proceed to the next question"
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 
-                rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1">
+                rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
                   Next Question <BsArrowRight size={18}/>
                 </button>
               </motion.div>
