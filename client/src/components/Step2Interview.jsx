@@ -21,15 +21,38 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [voiceGender, setVoiceGender] = useState("female");
   const [subtitle, setSubtitle] = useState("");
+  // The candidate's turn: opens only once the AI has finished the question
+  const [isAnswerPhase, setIsAnswerPhase] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
 
   const recognitionRef = useRef(null);
   const videoRef = useRef(null);
+
+  // Browser callbacks (speech synthesis, recognition) outlive the render that
+  // created them, so they must read live values through refs, not closures.
+  const isAIPlayingRef = useRef(false);
+  const isMicOnRef = useRef(true);
+  const speechTokenRef = useRef(0);
+  const suppressRestartRef = useRef(false);
+  // The mic and the speech callbacks need the candidate's turn synchronously,
+  // before the isAnswerPhase re-render lands.
+  const isAnswerPhaseRef = useRef(false);
+  // The voice is picked once; onvoiceschanged must not re-pick it mid-interview
+  const voiceLockedRef = useRef(false);
+  // Guards the one-submission-per-question rule across the Submit button and
+  // the timer expiring in the same tick.
+  const submitLockRef = useRef(false);
 
   const questions = interviewData?.questions || [];
   const interviewId = interviewData?.interviewId;
   const userName = interviewData?.userName;
 
   const currentQuestion = questions[currentIndex];
+
+  const setAnswerPhase = (value) => {
+    isAnswerPhaseRef.current = value;
+    setIsAnswerPhase(value);
+  };
 
   const totalQuestions = questions.length || 5;
 
@@ -42,10 +65,18 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
   // Load available browser voices
   useEffect(() => {
+    if (!window.speechSynthesis) return;
+
     const loadVoice = () => {
+      // Chrome fires onvoiceschanged more than once; re-selecting a voice would
+      // change the effect dependency and make the current question repeat.
+      if (voiceLockedRef.current) return;
+
       const voices = window.speechSynthesis.getVoices();
 
       if (!voices.length) return;
+
+      voiceLockedRef.current = true;
 
       // Try to find a female voice
       const femaleVoice = voices.find(
@@ -65,7 +96,9 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
       // Try to find a male voice
       const maleVoice = voices.find(
         (voice) =>
-          voice.name.toLowerCase().includes("male") ||
+          // "female" contains "male", so exclude it before matching
+          (voice.name.toLowerCase().includes("male") &&
+            !voice.name.toLowerCase().includes("female")) ||
           voice.name.toLowerCase().includes("david") ||
           voice.name.toLowerCase().includes("eric") ||
           voice.name.toLowerCase().includes("alex")
@@ -89,7 +122,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     return () => {
       window.speechSynthesis.onvoiceschanged = null;
     };
-  }, [currentIndex]);
+  }, []);
 
   // Speak text using browser speech synthesis
   const speakText = (text) => {
@@ -98,6 +131,9 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
         resolve();
         return;
       }
+
+      // Any utterance issued earlier is now stale and must not touch state
+      const token = ++speechTokenRef.current;
 
       window.speechSynthesis.cancel();
 
@@ -123,6 +159,9 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
       utterance.volume = 1;
 
       utterance.onstart = () => {
+        if (token !== speechTokenRef.current) return;
+
+        isAIPlayingRef.current = true;
         setIsAIPlaying(true);
         setIsListening(false);
 
@@ -134,32 +173,29 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
         }
       };
 
-      utterance.onend = () => {
+      const finishSpeaking = () => {
+        // A newer utterance already took over the avatar and the mic
+        if (token !== speechTokenRef.current) {
+          resolve();
+          return;
+        }
+
         if (videoRef.current) {
           videoRef.current.pause();
           videoRef.current.currentTime = 0;
         }
 
+        isAIPlayingRef.current = false;
         setIsAIPlaying(false);
 
         setSubtitle("");
 
-        if (isMicOn) {
-          startMic();
-        }
-
         resolve();
       };
 
-      utterance.onerror = () => {
-        if (videoRef.current) {
-          videoRef.current.pause();
-          videoRef.current.currentTime = 0;
-        }
+      utterance.onend = finishSpeaking;
 
-        setIsAIPlaying(false);
-        resolve();
-      };
+      utterance.onerror = finishSpeaking;
 
       // Chrome stops speaking after ~15s unless resumed periodically
       const keepAlive = setInterval(() => {
@@ -177,52 +213,105 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
       setSubtitle(text);
 
       // Chrome ignores speak() fired in the same tick as cancel()
-      setTimeout(() => window.speechSynthesis.speak(utterance), 100);
+      setTimeout(() => {
+        if (token !== speechTokenRef.current) {
+          clearInterval(keepAlive);
+          resolve();
+          return;
+        }
+
+        window.speechSynthesis.speak(utterance);
+      }, 100);
     });
+  };
+
+  // Stop whatever the AI is saying and reset the avatar
+  const cancelSpeech = () => {
+    speechTokenRef.current++;
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+
+    isAIPlayingRef.current = false;
+    setIsAIPlaying(false);
+    setSubtitle("");
   };
 
   // Run introduction and questions
   useEffect(() => {
-    if (!selectedVoice) {
+    // Without speech synthesis there is no voice to wait for; run the flow
+    // silently instead of leaving the interview stuck on the intro phase.
+    if (window.speechSynthesis && !selectedVoice) {
       return;
     }
+
+    if (isFinished) return;
+
+    let cancelled = false;
+
+    // A new question always starts in the AI's turn, never the candidate's
+    setAnswerPhase(false);
+    stopMic();
 
     const runIntro = async () => {
       if (isIntroPhase) {
         const welcomeMessage = `${userName || "Candidate"}, welcome to the interview. I'm your AI interviewer.`;
 
         await speakText(welcomeMessage);
+        if (cancelled) return;
 
         await speakText(
           "I'll ask you a series of questions. Please answer each question in a few sentences. Let's get started."
         );
+        if (cancelled) return;
 
         setIsIntroPhase(false);
       } else if (currentQuestion) {
         await new Promise((resolve) =>
           setTimeout(resolve, 800)
         );
+        if (cancelled) return;
 
         // If last question, make it harder
         if (currentIndex === questions.length - 1) {
           await speakText(
             "Alright, this one might be a bit more challenging."
           );
+          if (cancelled) return;
         }
 
         await speakText(currentQuestion.question);
+        if (cancelled) return;
 
-        if (isMicOn) {
+        // The question has been fully spoken: hand the turn to the candidate,
+        // which is what starts the timer.
+        setAnswerPhase(true);
+
+        if (isMicOnRef.current) {
           startMic();
         }
       }
     };
 
     runIntro();
+
+    // Leaving this question (or a Strict Mode remount) must silence the
+    // speech that belongs to it before the next one begins.
+    return () => {
+      cancelled = true;
+      cancelSpeech();
+    };
   }, [
     selectedVoice,
     currentIndex,
     isIntroPhase,
+    isFinished,
   ]);
 
   // Reset timer whenever question changes
@@ -237,6 +326,11 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     if (isIntroPhase) return;
     if (!currentQuestion) return;
     if(isSubmitting) return;
+    if (isAIPlaying) return;
+    if (feedback) return;
+    if (isFinished) return;
+    // Nothing ticks until the AI has finished asking
+    if (!isAnswerPhase) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -250,7 +344,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isIntroPhase, currentIndex, currentQuestion, isSubmitting]);
+  }, [isIntroPhase, currentIndex, currentQuestion, isSubmitting, isAIPlaying, feedback, isFinished, isAnswerPhase]);
 
   // Speech recognition setup
   useEffect(() => {
@@ -294,16 +388,43 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
         event.error
       );
 
+      // A denied microphone must not be retried in a loop
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed"
+      ) {
+        isMicOnRef.current = false;
+        setIsMicOn(false);
+      }
+
       setIsListening(false);
     };
 
     recognition.onend = () => {
       setIsListening(false);
+
+      // Chrome ends recognition on its own after a pause; resume it so the
+      // candidate can keep answering.
+      if (
+        !suppressRestartRef.current &&
+        isMicOnRef.current &&
+        !isAIPlayingRef.current
+      ) {
+        try {
+          recognition.start();
+        } catch (error) {
+          // Already restarted
+        }
+      }
     };
 
     recognitionRef.current = recognition;
 
     return () => {
+      // stop() fires onend; without this the handler would restart a
+      // recognition session that outlives the component.
+      suppressRestartRef.current = true;
+
       try {
         recognition.stop();
       } catch (error) {
@@ -317,9 +438,12 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
   const startMic = () => {
     if (
       recognitionRef.current &&
-      !isAIPlaying &&
-      isMicOn
+      !isAIPlayingRef.current &&
+      isMicOnRef.current &&
+      isAnswerPhaseRef.current
     ) {
+      suppressRestartRef.current = false;
+
       try {
         recognitionRef.current.start();
         setIsListening(true);
@@ -335,6 +459,9 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
   const stopMic = () => {
     if (recognitionRef.current) {
+      // A deliberate stop must not be undone by the auto-restart in onend
+      suppressRestartRef.current = true;
+
       try {
         recognitionRef.current.stop();
       } catch (error) {
@@ -348,23 +475,26 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
   const toggleMic = () => {
     if (isMicOn) {
       stopMic();
+      isMicOnRef.current = false;
       setIsMicOn(false);
       setIsListening(false);
     } else {
+      isMicOnRef.current = true;
       setIsMicOn(true);
 
-      if (!isAIPlaying) {
-        setTimeout(() => {
-          startMic();
-        }, 100);
-      }
+      startMic();
     }
   };
 
   const submitAnswer = async () => {
-    if (isSubmitting) return;
+    // Ref, not state: the Submit click and the timer hitting zero can land in
+    // the same tick, before isSubmitting has re-rendered.
+    if (submitLockRef.current) return;
     if (!currentQuestion) return;
 
+    submitLockRef.current = true;
+
+    setAnswerPhase(false);
     stopMic();
     setIsSubmitting(true);
 
@@ -376,33 +506,40 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
           questionIndex: currentIndex,
           answer,
           timeTaken:
-            (currentQuestion.timeLimit) - timeLeft,
+            (currentQuestion.timeLimit || 60) - timeLeft,
         },{withCredentials: true}
       );
 
+      // Showing feedback hands control to the "Next Question" button, which
+      // is what advances currentIndex.
       setFeedback(
-        result?.data?.feedback || ""
+        result?.data?.feedback || "Answer submitted."
       );
-
-      // Move to next question
-      if (currentIndex < questions.length - 1) {
-        setAnswer("");
-        setFeedback("");
-        setCurrentIndex((prev) => prev + 1);
-      } else {
-        if (onFinish) {
-          onFinish(result?.data);
-        }
-      }
     } catch (error) {
       console.error(
         "Error submitting answer:",
         error
       );
+
+      // Never leave the interview stuck on an expired timer
+      setFeedback(
+        "We couldn't save that answer. You can continue to the next question."
+      );
     } finally {
       setIsSubmitting(false);
+      submitLockRef.current = false;
     }
   };
+  // Time is up: submit whatever the candidate has, using the normal path
+  useEffect(() => {
+    if (!isAnswerPhase) return;
+    if (isFinished) return;
+    if (feedback) return;
+    if (timeLeft > 0) return;
+
+    submitAnswer();
+  }, [timeLeft, isAnswerPhase, isFinished, feedback]);
+
   const handleNext = async ()=> {
     setAnswer("")
     setFeedback("")
@@ -414,19 +551,34 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
     await speakText("Alright, let's move to the next question.");
 
     setCurrentIndex(currentIndex + 1);
-    setTimeout(()=>{
-      if (isMicOn) startMic();
-    },500);
   }
 
   const finishInterview = async () =>{
+    if (submitLockRef.current) return;
+
+    submitLockRef.current = true
+
+    setIsFinished(true)
+    setAnswerPhase(false)
+    setIsSubmitting(true)
+
     stopMic()
+    isMicOnRef.current = false
     setIsMicOn(false)
+    cancelSpeech()
+
     try {
       const result = await axios.post(ServerUrl + "/api/interview/finish", {
         interviewId }, {withCredentials: true})
+
+      if (onFinish) {
+        onFinish(result?.data)
+      }
     } catch (error) {
-      
+      console.error("Error finishing interview:", error)
+    } finally {
+      setIsSubmitting(false)
+      submitLockRef.current = false
     }
   }
 
@@ -443,6 +595,7 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
               key={videoSource}
               ref={videoRef}
               muted
+              loop
               playsInline
               preload="auto"
               className="w-full h-auto object-cover"
@@ -558,9 +711,18 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
               )}
             </motion.button>
 
+            <motion.button
+              onClick={submitAnswer}
+              disabled={isSubmitting || isAIPlaying || !isAnswerPhase || !answer.trim()}
+              whileTap={{ scale: 0.95 }}
+              className="px-5 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition disabled:bg-gray-400"
+            >
+              {isSubmitting ? "Submitting..." : "Submit Answer"}
+            </motion.button>
+
             {onFinish && (
               <motion.button
-                onClick={onFinish}
+                onClick={finishInterview}
                 disabled={isSubmitting}
                 whileTap={{scale: 0.95}}
                 className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition
