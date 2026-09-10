@@ -50,7 +50,13 @@ export const analyzeResume = async (req, res) => {
     }
 
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
+    if (!user) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
