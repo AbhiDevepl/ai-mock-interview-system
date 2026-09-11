@@ -17,7 +17,8 @@ app.set("trust proxy", 1);
 app.use(helmet());
 
 const corsOptions = {
-  origin: process.env.CLIENT_URL ,
+  // Prevent undefined CLIENT_URL from allowing origin reflection with credentials
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
   credentials: true,
 };
 

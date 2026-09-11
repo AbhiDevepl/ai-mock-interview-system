@@ -42,13 +42,6 @@ describe('Interview Controller Hardening & Validation', () => {
   beforeEach(async () => {
     await User.deleteMany({});
     await Interview.deleteMany({});
-    await User.create({
-      _id: '660000000000000000000001',
-      name: 'John Doe',
-      email: 'john@example.com',
-      credits: 100,
-      isActive: true,
-    });
     jest.clearAllMocks();
 
     // Create default active user to ensure checks pass

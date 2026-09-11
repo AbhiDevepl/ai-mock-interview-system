@@ -45,8 +45,6 @@ jest.unstable_mockModule('../config/token.js', () => ({
 
 // Mock Multer upload middleware
 import { upload } from '../middleware/multer.js';
-import fs from 'fs';
-import path from 'path';
 
 // NOW IMPORT CONTROLLER
 const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
