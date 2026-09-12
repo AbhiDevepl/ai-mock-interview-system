@@ -7,16 +7,22 @@ import Interview from '../models/interview.model.js';
 import { jest } from '@jest/globals';
 import fs from 'fs';
 import path from 'path';
+import jwt from 'jsonwebtoken';
+
+const mockAskAi = jest.fn();
+jest.unstable_mockModule('../services/openRouter.service.js', () => ({
+  askAi: mockAskAi,
+}));
 
 // Mock isAuth middleware
 jest.unstable_mockModule('../middleware/isAuth.js', () => ({
   default: jest.fn((req, res, next) => {
-    req.userId = '660000000000000000000001';
+    req.userId = req.headers['x-user-id'] || req.headers['userid'] || '660000000000000000000001';
     req.userRole = 'user';
     next();
   }),
   optionalAuth: jest.fn((req, res, next) => {
-    req.userId = '660000000000000000000001';
+    req.userId = req.headers['x-user-id'] || req.headers['userid'] || '660000000000000000000001';
     req.userRole = 'user';
     next();
   }),
@@ -44,14 +50,17 @@ jest.unstable_mockModule('../config/token.js', () => ({
 }));
 
 // Mock Multer upload middleware
+import cookieParser from 'cookie-parser';
 import { upload } from '../middleware/multer.js';
-import fs from 'fs';
-import path from 'path';
 
 // NOW IMPORT CONTROLLER
 const { googleAuth, refreshAuth } = await import('../controllers/auth.controller.js');
 const { getCurrentUser } = await import('../controllers/user.controller.js');
 const { generateQuestion, analyzeResume, submitAnswer } = await import('../controllers/interview.controller.js');
+
+const userRouter = (await import('../routers/user.route.js')).default;
+const interviewRouter = (await import('../routers/interview.route.js')).default;
+const resumeRouter = (await import('../routers/resume.route.js')).default;
 
 const app = express();
 app.use(cookieParser());
@@ -59,6 +68,7 @@ app.use(express.json());
 
 // Mount routers
 app.post('/api/auth/google', googleAuth);
+app.post('/api/auth/refresh', refreshAuth);
 app.use('/api/user', userRouter);
 app.use('/api/interview', interviewRouter);
 app.use('/api/resume', resumeRouter);
@@ -81,6 +91,7 @@ app.post('/api/interview/resume', mockIsAuth, upload.single('resume'), analyzeRe
 app.post('/api/interview/submit-answer', mockIsAuth, submitAnswer);
 
 let mongoServer;
+const publicDir = path.resolve(process.cwd(), 'public');
 
 beforeAll(async () => {
   process.env.JWT_SECRET = 'test-secret-key-123';
@@ -186,10 +197,10 @@ describe('Security Hardening Deactivation Tests', () => {
     it('should reject deactivated users, clear session cookie, and return 401', async () => {
       const response = await request(app)
         .get('/api/user/current-user')
-        .set('userid', deactivatedUserId);
+        .set('x-user-id', deactivatedUserId);
 
       expect(response.status).toBe(401);
-      expect(response.body.message).toBe('Unauthorized access.');
+      expect(response.body.message).toBe('Authentication required.');
       // Verify that the JWT session cookie is cleared
       const cookies = response.headers['set-cookie'] || [];
       const hasClearedToken = cookies.some(cookie => cookie.includes('token=') && (cookie.includes('1970') || cookie.includes('Max-Age=0') || cookie.includes('expires=')));
@@ -199,7 +210,7 @@ describe('Security Hardening Deactivation Tests', () => {
     it('should successfully return the active user without sensitive or status fields', async () => {
       const response = await request(app)
         .get('/api/user/current-user')
-        .set('userid', activeUserId);
+        .set('x-user-id', activeUserId);
 
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Active User');
@@ -212,7 +223,7 @@ describe('Security Hardening Deactivation Tests', () => {
     it('should reject deactivated users with 403 Forbidden to protect metered AI APIs', async () => {
       const response = await request(app)
         .post('/api/interview/generate-question')
-        .set('userid', deactivatedUserId)
+        .set('x-user-id', deactivatedUserId)
         .send({
           role: 'Software Engineer',
           experience: '2 years',
@@ -229,7 +240,7 @@ describe('Security Hardening Deactivation Tests', () => {
 
       const response = await request(app)
         .post('/api/interview/generate-question')
-        .set('userid', activeUserId)
+        .set('x-user-id', activeUserId)
         .send({
           role: 'Software Engineer',
           experience: '2 years',
@@ -247,7 +258,7 @@ describe('Security Hardening Deactivation Tests', () => {
 
       const response = await request(app)
         .post('/api/interview/resume')
-        .set('userid', deactivatedUserId)
+        .set('x-user-id', deactivatedUserId)
         .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
 
       expect(response.status).toBe(403);
@@ -260,13 +271,46 @@ describe('Security Hardening Deactivation Tests', () => {
     });
 
     it('should process resume for active users', async () => {
-      const buffer = Buffer.from('%PDF-1.4 dummy pdf content');
+      // Minimal valid single-page PDF with correct cross-reference offsets
+      const samplePdf = Buffer.from(
+        '%PDF-1.4\n' +
+        '1 0 obj\n' +
+        '<< /Type /Catalog /Pages 2 0 R >>\n' +
+        'endobj\n' +
+        '2 0 obj\n' +
+        '<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n' +
+        'endobj\n' +
+        '3 0 obj\n' +
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\n' +
+        'endobj\n' +
+        '4 0 obj\n' +
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n' +
+        'endobj\n' +
+        '5 0 obj\n' +
+        '<< /Length 54 >>\n' +
+        'stream\n' +
+        'BT /F1 12 Tf 100 700 Td (Software Engineer Resume) Tj ET\n' +
+        'endstream\n' +
+        'endobj\n' +
+        'xref\n' +
+        '0 6\n' +
+        '0000000000 65535 f \n' +
+        '0000000009 00000 n \n' +
+        '0000000060 00000 n \n' +
+        '0000000122 00000 n \n' +
+        '0000000257 00000 n \n' +
+        '0000000331 00000 n \n' +
+        'trailer\n' +
+        '<< /Size 6 /Root 1 0 R >>\n' +
+        '392\n' +
+        '%%EOF'
+      );
       mockAskAi.mockResolvedValue('{"role": "Engineer", "experience": "Senior", "projects": [], "skills": []}');
 
       const response = await request(app)
         .post('/api/interview/resume')
-        .set('userid', activeUserId)
-        .attach('resume', buffer, { filename: 'resume.pdf', contentType: 'application/pdf' });
+        .set('x-user-id', activeUserId)
+        .attach('resume', samplePdf, { filename: 'resume.pdf', contentType: 'application/pdf' });
 
       expect(response.status).toBe(200);
       expect(mockAskAi).toHaveBeenCalled();
@@ -275,47 +319,56 @@ describe('Security Hardening Deactivation Tests', () => {
 
   describe('refreshAuth Controller', () => {
     it('should clear cookies and return 401 when the refreshing user is deactivated', async () => {
+      const deactivatedRefreshToken = jwt.sign(
+        { userId: deactivatedUserId, type: 'refresh' },
+        process.env.JWT_SECRET
+      );
+
       const response = await request(app)
         .post('/api/auth/refresh')
-        .set('Cookie', ['refreshToken=deactivated-refresh-token']);
+        .set('Cookie', [`refreshToken=${deactivatedRefreshToken}`]);
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe('Authentication required.');
 
       const cookies = response.headers['set-cookie'] || [];
-      const hasClearedToken = cookies.some(cookie => cookie.includes('token=') && (cookie.includes('1970') || cookie.includes('Max-Age=0') || cookie.includes('expires=')));
-      const hasClearedRefreshToken = cookies.some(cookie => cookie.includes('refreshToken=') && (cookie.includes('1970') || cookie.includes('Max-Age=0') || cookie.includes('expires=')));
+      const hasClearedToken = cookies.some(cookie => cookie.includes('token=;'));
+      const hasClearedRefreshToken = cookies.some(cookie => cookie.includes('refreshToken=;'));
       expect(hasClearedToken).toBe(true);
       expect(hasClearedRefreshToken).toBe(true);
     });
 
     it('should allow active users to refresh session and set new tokens', async () => {
+      const activeRefreshToken = jwt.sign(
+        { userId: activeUserId, type: 'refresh' },
+        process.env.JWT_SECRET
+      );
+
       const response = await request(app)
         .post('/api/auth/refresh')
-        .set('Cookie', ['refreshToken=valid-refresh-token']);
+        .set('Cookie', [`refreshToken=${activeRefreshToken}`]);
 
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Active User');
 
       const cookies = response.headers['set-cookie'] || [];
-      const hasToken = cookies.some(cookie => cookie.includes('token=') && !cookie.includes('token=;'));
-      const hasRefreshToken = cookies.some(cookie => cookie.includes('refreshToken=') && !cookie.includes('refreshToken=;'));
+      const hasToken = cookies.some(cookie => cookie.includes('token=mock-access-token'));
+      const hasRefreshToken = cookies.some(cookie => cookie.includes('refreshToken=mock-refresh-token'));
       expect(hasToken).toBe(true);
       expect(hasRefreshToken).toBe(true);
     });
   });
 
-  describe('getCurrentUser Controller hardening', () => {
+  describe('getCurrentUser Controller hardening (sub-suite)', () => {
     it('should reject deactivated users and clear session cookie', async () => {
-      await User.create({
-        _id: '660000000000000000000001',
-        name: 'Deactivated User',
-        email: 'deactivated@example.com',
-        isActive: false,
-      });
+      await User.updateOne(
+        { _id: deactivatedUserId },
+        { $set: { isActive: false } }
+      );
 
       const response = await request(app)
-        .get('/api/user/current-user');
+        .get('/api/user/current-user')
+        .set('x-user-id', deactivatedUserId);
 
       expect(response.status).toBe(401);
       expect(response.body.message).toBe('Authentication required.');
@@ -327,15 +380,9 @@ describe('Security Hardening Deactivation Tests', () => {
     });
 
     it('should allow active users', async () => {
-      await User.create({
-        _id: '660000000000000000000001',
-        name: 'Active User',
-        email: 'active@example.com',
-        isActive: true,
-      });
-
       const response = await request(app)
-        .get('/api/user/current-user');
+        .get('/api/user/current-user')
+        .set('x-user-id', activeUserId);
 
       expect(response.status).toBe(200);
       expect(response.body.name).toBe('Active User');
@@ -343,17 +390,11 @@ describe('Security Hardening Deactivation Tests', () => {
     });
   });
 
-  describe('generateQuestion Controller deactivation hardening', () => {
+  describe('generateQuestion Controller deactivation hardening (sub-suite)', () => {
     it('should reject deactivated users with 403', async () => {
-      await User.create({
-        _id: '660000000000000000000001',
-        name: 'Deactivated User',
-        email: 'deactivated@example.com',
-        isActive: false,
-      });
-
       const response = await request(app)
         .post('/api/interview/generate-question')
+        .set('x-user-id', deactivatedUserId)
         .send({
           role: 'Software Engineer',
           experience: 'Senior',
@@ -365,17 +406,11 @@ describe('Security Hardening Deactivation Tests', () => {
     });
   });
 
-  describe('analyzeResume Controller deactivation hardening', () => {
+  describe('analyzeResume Controller deactivation hardening (sub-suite)', () => {
     it('should reject deactivated users with 403', async () => {
-      await User.create({
-        _id: '660000000000000000000001',
-        name: 'Deactivated User',
-        email: 'deactivated@example.com',
-        isActive: false,
-      });
-
       const response = await request(app)
-        .post('/api/interview/resume');
+        .post('/api/interview/resume')
+        .set('x-user-id', deactivatedUserId);
 
       expect(response.status).toBe(403);
       expect(response.body.message).toBe('This account has been deactivated.');
