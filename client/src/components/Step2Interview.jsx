@@ -684,7 +684,11 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
           </div>
 
+          <label htmlFor="interview-answer" className="sr-only">
+            Your Answer
+          </label>
           <textarea
+            id="interview-answer"
             value={answer}
             onChange={(e) =>
               setAnswer(e.target.value)
@@ -696,9 +700,13 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
           {!feedback ? (<div className="flex items-center gap-4 mt-6">
 
             <motion.button
+              type="button"
               onClick={toggleMic}
+              aria-label={isMicOn ? "Turn off microphone" : "Turn on microphone"}
+              aria-pressed={isMicOn}
+              title={isMicOn ? "Turn off microphone" : "Turn on microphone"}
               whileTap={{ scale: 0.9 }}
-              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
+              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 outline-none ${
                 isListening
                   ? "bg-emerald-600"
                   : "bg-black"
@@ -712,20 +720,22 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
             </motion.button>
 
             <motion.button
+              type="button"
               onClick={submitAnswer}
               disabled={isSubmitting || isAIPlaying || !isAnswerPhase || !answer.trim()}
               whileTap={{ scale: 0.95 }}
-              className="px-5 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition disabled:bg-gray-400"
+              className="px-5 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 outline-none disabled:bg-gray-400"
             >
               {isSubmitting ? "Submitting..." : "Submit Answer"}
             </motion.button>
 
             {onFinish && (
               <motion.button
+                type="button"
                 onClick={finishInterview}
                 disabled={isSubmitting}
                 whileTap={{scale: 0.95}}
-                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition
+                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 outline-none
               disabled:bg-gray-500">
                 {isSubmitting?"Submitting...":
                 "Finish"}
@@ -742,9 +752,10 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
                   {feedback}
                 </p>
                 <button
+                type="button"
                 onClick={handleNext}
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 
-                rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1">
+                rounded-xl shadow-md hover:opacity-90 transition focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 outline-none flex items-center justify-center gap-1">
                   Next Question <BsArrowRight size={18}/>
                 </button>
               </motion.div>
