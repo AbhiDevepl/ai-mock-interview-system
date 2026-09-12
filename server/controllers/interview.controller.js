@@ -50,7 +50,13 @@ export const analyzeResume = async (req, res) => {
     }
 
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
+    if (!user) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
@@ -200,7 +206,7 @@ export const generateQuestion = async (req, res) => {
     // AI calls for users with insufficient credits.
     const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
     if (!userPreCheck) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
     if (userPreCheck.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
