@@ -2,7 +2,21 @@ import request from 'supertest';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
+import { jest } from '@jest/globals';
+
+jest.unstable_mockModule('firebase-admin/app', () => ({
+  initializeApp: jest.fn(),
+  cert: jest.fn(),
+  getApps: jest.fn(() => [{}]),
+}));
+
+jest.unstable_mockModule('firebase-admin/auth', () => ({
+  getAuth: jest.fn(() => ({})),
+}));
+
 import isAuth from '../middleware/isAuth.js';
+const { getMe } = await import('../controllers/auth.controller.js');
+const User = (await import('../models/user.model.js')).default;
 
 const app = express();
 app.use(cookieParser());
@@ -43,5 +57,27 @@ describe('isAuth Middleware', () => {
       .get('/test-auth')
       .set('Cookie', [`token=${token}`]);
     expect(response.status).toBe(401);
+  });
+
+  it('should clear token, refreshToken, and deviceId cookies in getMe when user is inactive or not found', async () => {
+    jest.spyOn(User, 'findById').mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(null),
+      }),
+    });
+
+    const req = { userId: 'nonexistent123' };
+    const res = {
+      clearCookie: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
+    await getMe(req, res);
+
+    expect(res.clearCookie).toHaveBeenCalledWith('token', expect.any(Object));
+    expect(res.clearCookie).toHaveBeenCalledWith('refreshToken', expect.any(Object));
+    expect(res.clearCookie).toHaveBeenCalledWith('deviceId', expect.any(Object));
+    expect(res.status).toHaveBeenCalledWith(401);
   });
 });
