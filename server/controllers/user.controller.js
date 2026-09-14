@@ -29,6 +29,7 @@ export const getCurrentUser = async (req, res) => {
       };
       res.clearCookie("token", COOKIE_OPTIONS);
       res.clearCookie("refreshToken", COOKIE_OPTIONS);
+      res.clearCookie("deviceId", COOKIE_OPTIONS);
       console.warn(`Deactivated user access attempt blocked: ${userId}`);
       return res.status(401).json({ message: "Authentication required." });
     }
