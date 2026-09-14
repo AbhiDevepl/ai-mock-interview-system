@@ -33,3 +33,7 @@ This journal records critical user experience and accessibility insights discove
 ## 2025-03-04 - Accessible Countdown Timer ARIA Attributes & Dynamic Warning Indicators
 **Learning:** Visual progress and timer components in interactive flows (like mock interviews) are often invisible to screen readers without standard timer semantics (`role="timer"`, `aria-valuenow`, `aria-valuetext`, `aria-live="polite"`). In addition, static color schemes for timers fail to convey urgency to visual users when time is nearly elapsed. Dynamic color transitions (e.g. turning path and text color red when time crosses $\le 5$ seconds) combined with live ARIA announcements provide complete multi-sensory feedback.
 **Action:** Always wrap progress/countdown components with `role="timer"` and dynamic ARIA attributes, and transition visual indicator colors to warning states when time crosses a critical threshold.
+
+## 2025-03-05 - Icon-only Media Toggle Accessibility & Keyboard Focus
+**Learning:** Icon-only media toggle controls (such as microphone mute/unmute buttons in voice interviews) are invisible to screen readers without standard ARIA attributes (`aria-label`, `aria-pressed`, `title`). Furthermore, without `focus-visible:ring-2` indicators, keyboard users cannot easily determine focus state during real-time sessions.
+**Action:** Always include dynamic `aria-label` descriptions, state descriptors (`aria-pressed`), hover tooltips (`title`), and focus visible indicators (`focus-visible:ring-2 focus-visible:ring-offset-2`) on media control toggles.
