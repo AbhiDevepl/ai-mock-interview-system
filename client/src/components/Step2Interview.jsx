@@ -684,24 +684,34 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
 
           </div>
 
+          <label htmlFor="candidate-answer-input" className="sr-only">
+            Your Answer
+          </label>
           <textarea
+            id="candidate-answer-input"
             value={answer}
             onChange={(e) =>
               setAnswer(e.target.value)
             }
             placeholder="Type Your Answer Here..."
-            className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 transition text-gray-800"
+            aria-label="Your Answer"
+            className="flex-1 bg-gray-100 p-4 sm:p-6 rounded-2xl resize-none outline-none border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500 transition text-gray-800"
           />
 
           {!feedback ? (<div className="flex items-center gap-4 mt-6">
 
             <motion.button
+              type="button"
               onClick={toggleMic}
               whileTap={{ scale: 0.9 }}
-              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors ${
+              whileHover={{ scale: 1.05 }}
+              aria-label={isMicOn ? "Mute microphone" : "Unmute microphone"}
+              aria-pressed={isMicOn}
+              title={isMicOn ? "Microphone active. Click to mute." : "Microphone muted. Click to unmute."}
+              className={`w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full shadow-lg transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 ${
                 isListening
-                  ? "bg-emerald-600"
-                  : "bg-black"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-black hover:bg-gray-800"
               } text-white`}
             >
               {isMicOn ? (
@@ -712,21 +722,22 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
             </motion.button>
 
             <motion.button
+              type="button"
               onClick={submitAnswer}
               disabled={isSubmitting || isAIPlaying || !isAnswerPhase || !answer.trim()}
               whileTap={{ scale: 0.95 }}
-              className="px-5 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition disabled:bg-gray-400"
+              className="px-5 py-2 rounded-full bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
             >
               {isSubmitting ? "Submitting..." : "Submit Answer"}
             </motion.button>
 
             {onFinish && (
               <motion.button
+                type="button"
                 onClick={finishInterview}
                 disabled={isSubmitting}
                 whileTap={{scale: 0.95}}
-                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition
-              disabled:bg-gray-500">
+                className="ml-auto px-5 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-300 transition disabled:bg-gray-400 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
                 {isSubmitting?"Submitting...":
                 "Finish"}
               </motion.button>
@@ -742,9 +753,10 @@ function Step2Interview({ interviewData = null, onFinish = null }) {
                   {feedback}
                 </p>
                 <button
+                type="button"
                 onClick={handleNext}
                 className="w-full bg-gradient-to-r from-emerald-600 to-teal-500 text-white py-3 
-                rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1">
+                rounded-xl shadow-md hover:opacity-90 transition flex items-center justify-center gap-1 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2">
                   Next Question <BsArrowRight size={18}/>
                 </button>
               </motion.div>
