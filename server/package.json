@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest --verbose --force-exit",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --verbose --force-exit",
     "test:authcat": "node --experimental-vm-modules node_modules/.bin/jest __tests__/authcat-validation.test.js --verbose --force-exit"
   },
   "keywords": [],
