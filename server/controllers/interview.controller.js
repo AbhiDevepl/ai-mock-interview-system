@@ -50,7 +50,13 @@ export const analyzeResume = async (req, res) => {
     }
 
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (!user || user.isActive === false) {
+    if (!user) {
+      if (filepath && fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       if (filepath && fs.existsSync(filepath)) {
         fs.unlinkSync(filepath);
       }
@@ -200,7 +206,7 @@ export const generateQuestion = async (req, res) => {
     // AI calls for users with insufficient credits.
     const userPreCheck = await User.findById(req.userId).select("credits isActive").lean();
     if (!userPreCheck) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
     if (userPreCheck.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
@@ -215,7 +221,7 @@ export const generateQuestion = async (req, res) => {
       Array.isArray(projects) && projects.length ? projects.join(",") : "None";
     const skillText =
       Array.isArray(skills) && skills.length ? skills.join(",") : "None";
-    const sefeResume = resumeText?.trim() || "None";
+    const safeResume = resumeText?.trim() || "None";
 
     const userPrompt = `
     Role:${role}
@@ -223,7 +229,7 @@ export const generateQuestion = async (req, res) => {
     InterviewMode:${mode}
     Projects:${projectText}
     Skills:${skillText}
-    Resume:${resumeText}`;
+    Resume:${safeResume}`;
 
     if (!userPrompt.trim()) {
       return res.status(400).json({ message: "prompt is required" });
@@ -336,7 +342,7 @@ export const generateQuestion = async (req, res) => {
       mode: dbMode,
       projects,
       skills,
-      resumeText: sefeResume,
+      resumeText: safeResume,
     });
 
     res.json({
@@ -354,7 +360,10 @@ export const generateQuestion = async (req, res) => {
 export const submitAnswer = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (user && user.isActive === false) {
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
@@ -526,7 +535,10 @@ export const submitAnswer = async (req, res) => {
 export const finishInterview = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("isActive").lean();
-    if (user && user.isActive === false) {
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (user.isActive === false) {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
